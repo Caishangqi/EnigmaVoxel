@@ -1,23 +1,31 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
-#include "EnigmaVoxel/Core/Register/Definition.h"
-#include "UObject/Object.h"
-#include "Block.generated.h"
+#include "BlockDefinition.h"
 
-/**
- * 
- */
-UCLASS()
-class ENIGMAVOXEL_API UBlock : public UDefinition
+// 一个简单的结构体，用于表示区块中单个方块实例
+struct FBlock
 {
-	GENERATED_BODY()
+	// 指向全局注册的方块定义
+	UBlockDefinition* Definition = nullptr;
 
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block")
-	TObjectPtr<UStaticMeshComponent> Model;
+	// 方块在世界或区块中的坐标（例如使用整数坐标）
+	FIntVector Coordinates;
 
-	
+	// 例如方块的当前健康值
+	int32 Health = 100;
+
+	FBlock()
+		: Definition(nullptr)
+		  , Coordinates(FIntVector::ZeroValue)
+		  , Health(100) // 默认生命值
+	{
+	}
+
+	FBlock(const FIntVector& InCoords, UBlockDefinition* InDefinition, int32 InHealth = 100)
+		: Definition(InDefinition)
+		  , Coordinates(InCoords)
+		  , Health(InHealth)
+	{
+	}
 };
