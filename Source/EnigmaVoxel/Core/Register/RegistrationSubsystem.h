@@ -9,7 +9,7 @@
 #include "RegistrationSubsystem.generated.h"
 
 class UContentRegister;
-class UBlock;
+class UBlockDefinition;
 
 USTRUCT(BlueprintType)
 struct FResourceRegister
@@ -44,8 +44,14 @@ public:
 
 public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+
 	UFUNCTION(BlueprintCallable, Category = "Registration")
-	static UBlockRegister* BLOCK(FString NameSpace);
+	static UBlockRegister* BLOCK(FString NameSpace = "Enigma");
+
+	/// Query
+public:
+	UFUNCTION(BlueprintCallable, Category = "Registration")
+	static UBlockDefinition* BLOCK_GET_VALUE(FString NameSpace = "Enigma", FString ID = "");
 
 private:
 	static URegistrationSubsystem* registrationSubsystem;
