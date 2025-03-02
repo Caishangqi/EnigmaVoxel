@@ -9,16 +9,15 @@
 /**
  * 
  */
-UCLASS()
+UCLASS(Abstract)
 class ENIGMAVOXEL_API UDefinition : public UObject
 {
 	GENERATED_BODY()
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FString ID = "";
+	FString ID;
 
 public:
 	UDefinition();
-
 };
