@@ -6,7 +6,7 @@
 <img src = "https://i.imgur.com/EF6t6WA.png" alt="">
 </p>
 
-<h4 align="center">整合包 CharmingCraft: Journey 的定制模组 添加了额外的程序化游戏内容</h4>
+<h4 align="center">基于 Unreal Engine 5 实现体素多模型Mesh合并算法</h4>
 <p align="center">
 <a href="https://www.codefactor.io/repository/github/caishangqi/CharmingJourneyCore"><img src="https://www.codefactor.io/repository/github/caishangqi/charming-realm-system/badge" alt="CodeFactor" /></a>
 <img alt="Lines of code" src="https://img.shields.io/tokei/lines/github/Caishangqi/CharmingJourneyCore">
@@ -17,19 +17,25 @@
 
 ## 概述
 
-该模组为整合包 **CharmingCraft: Journey** 提供了额外的自定义内容，包含整合包需要的物品，方块，和额外的游戏机制，丰富整合包设定。同时，该模组作为测试模组，会对OpenGL进行额外的测试。
+基于 Unreal Engine 5.5 的 `DynamicMesh` 实现的区块加载和隐藏顶点/三角形剔除，核心业务逻辑包括 `Chunk`, `Block` 由C++实现，不同的方块类型则使用蓝图基类 `Block_C` 继承
+
 ## 特性
 
 > *斜体* 内容代表计划内容，非斜体代表已经完善的内容
 
-- 电力魔力饰品, 支持 **RF** 转Ars的魔力单元
+- Block 注册系统和 Block 定义
+- 基于蓝图的 Dynamic Mesh Actor 实现方块的添加,指定面剔除和添加材质槽
 
 
 
-- *电力魔力饰品, 支持 **EU** 转Ars的魔力单元*
-- *地质相关的方块和物品, 丰富洞穴探索*
-- _模块化染色家具, 支持原版的所有染料_
+- *完整的区块系统, 包括区块数据结构, 破坏放置方块时更新区块顶点*
+- *完整的破坏和放置机制, 基于事件去更新 Chunk 的所有顶点*
+- *区块系统序列化, 创建可序列化的数据结构, 可在蓝图中编辑器中更新区块所包含的方块并且实时更新到视口中*
+- *额外方块模型支持, 例如半砖, 竖砖块*
+- _支持柏林噪声世界生成, 区块加载卸载_
   ...
+
+
 
 ## 特别说明
 
