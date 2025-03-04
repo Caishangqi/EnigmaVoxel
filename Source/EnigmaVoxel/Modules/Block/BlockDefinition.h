@@ -7,10 +7,19 @@
 #include "UObject/Object.h"
 #include "BlockDefinition.generated.h"
 
+
 /**
  * 
  */
-UCLASS(Blueprintable,BlueprintType)
+UENUM(BlueprintType)
+enum class ECollisionType: uint8
+{
+	UNIT_BLOCK,
+	UNIT_BLOCK_HALF,
+	CUSTOM
+};
+
+UCLASS(Blueprintable, BlueprintType)
 class ENIGMAVOXEL_API UBlockDefinition : public UDefinition
 {
 	GENERATED_BODY()
@@ -19,6 +28,24 @@ public:
 	UBlockDefinition();
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block")
+	/// Internal Block ID, use for chunk storage
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category="Block Definition")
+	int64 BlockID = 0;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category="Block Definition")
+	ECollisionType CollisionType = ECollisionType::UNIT_BLOCK;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block Definition")
 	TObjectPtr<UStaticMeshComponent> Model;
+
+public:
+	/// We like Minecraft so we use their method
+	/// Destroy logic could look Neo forge implementation quite perfect
+
+	/// OnFinishDestroy
+	/// OnBeginDestroy
+	/// OnDrop
+	/// OnDuringDestroy
+	/// OnClick
+	/// OnInteract
 };
