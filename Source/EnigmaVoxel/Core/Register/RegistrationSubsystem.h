@@ -30,7 +30,7 @@ public:
 /**
  * 
  */
-UCLASS()
+UCLASS(Blueprintable)
 class ENIGMAVOXEL_API URegistrationSubsystem : public UGameInstanceSubsystem
 {
 	GENERATED_BODY()
