@@ -3,21 +3,34 @@
 
 #include "RegistrationSubsystem.h"
 
+#include "RegistrationDelegates.h"
 #include "EnigmaVoxel/EnigmaVoxel.h"
+#include "EnigmaVoxel/Core/EVGameInstance.h"
+#include "EnigmaVoxel/Core/GameInstanceDelegates.h"
+#include "EnigmaVoxel/Core/Log/DefinedLog.h"
 #include "EnigmaVoxel/Modules/Block/BlockDefinition.h"
 #include "EnigmaVoxel/Modules/Block/BlockRegister.h"
 
 URegistrationSubsystem* URegistrationSubsystem::registrationSubsystem = nullptr;
+URegistrationDelegates* URegistrationSubsystem::EventDispatcher       = nullptr;
 
 URegistrationSubsystem* URegistrationSubsystem::GetRegistrationSubsystem()
 {
 	return registrationSubsystem;
 }
 
+
 void URegistrationSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
-	Super::Initialize(Collection);
 	registrationSubsystem = this;
+	FRegistrationDelegates::OnRegistrationInitialize.Broadcast();
+	UE_LOG(LogEnigmaVoxelRegister, Log, TEXT("Registration subsystem initialized"));
+	Super::Initialize(Collection);
+}
+
+void URegistrationSubsystem::PostInitProperties()
+{
+	Super::PostInitProperties();
 }
 
 UBlockRegister* URegistrationSubsystem::BLOCK(FString NameSpace)

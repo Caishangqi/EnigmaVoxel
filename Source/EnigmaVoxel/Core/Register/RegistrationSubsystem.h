@@ -8,6 +8,7 @@
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "RegistrationSubsystem.generated.h"
 
+class URegistrationDelegates;
 class UContentRegister;
 class UBlockDefinition;
 
@@ -44,6 +45,7 @@ public:
 
 public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+	virtual void PostInitProperties() override;
 
 	UFUNCTION(BlueprintCallable, Category = "Registration")
 	static UBlockRegister* BLOCK(FString NameSpace = "Enigma");
@@ -55,4 +57,5 @@ public:
 
 private:
 	static URegistrationSubsystem* registrationSubsystem;
+	static URegistrationDelegates* EventDispatcher;
 };
