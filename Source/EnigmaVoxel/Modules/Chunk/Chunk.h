@@ -39,7 +39,10 @@ protected:
 	FBlock& GetBlockAt(FIntVector InCoords);
 	UFUNCTION(BlueprintCallable)
 	int32 GetBlockIndexAt(FIntVector InCoords);
+	UFUNCTION(BlueprintCallable)
+	bool IsVisibleFace(FBlock& currentBlock, EBlockDirection InDirection);
 
+protected:
 	// Setter
 	/// Update Block by using FBlock Data, if the Block Definition inside
 	/// FBlock is null the method will return false else return true. The
@@ -63,6 +66,12 @@ protected:
 	/// @return whether or not rebuild successful
 	UFUNCTION(BlueprintCallable)
 	bool UpdateChunk();
+
+	/// Utility Function Right now for quickly fill the chunk with blocks
+	/// TODO: the functions inside chunk will move to world subsystem perhaps
+protected:
+	UFUNCTION(BlueprintCallable)
+	bool FillChunkWithXYZ(FIntVector fillArea, FString Namespace = "Enigma", FString Path = "");
 
 private:
 	/// Append Box to current Chunk dynamic mesh, this method would also
