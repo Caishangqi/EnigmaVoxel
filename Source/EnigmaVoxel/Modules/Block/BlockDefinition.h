@@ -18,6 +18,16 @@ enum class ECollisionType: uint8
 	UNIT_BLOCK_HALF,
 	CUSTOM
 };
+UENUM(BlueprintType)
+enum class EBlockDirection: uint8
+{
+	NORTH,
+	SOUTH,
+	EAST,
+	WEST,
+	UP,
+	DOWN
+};
 
 UCLASS(Blueprintable, BlueprintType)
 class ENIGMAVOXEL_API UBlockDefinition : public UDefinition
@@ -32,9 +42,11 @@ public:
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category="Block Definition")
 	int64 BlockID = 0;
 
+	/// TODO: use block properties builder in the future
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category="Block Definition")
 	ECollisionType CollisionType = ECollisionType::UNIT_BLOCK;
-
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category="Block Definition")
+	bool bIsOpaque = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block Definition")
 	TObjectPtr<UStaticMeshComponent> Model;
 
