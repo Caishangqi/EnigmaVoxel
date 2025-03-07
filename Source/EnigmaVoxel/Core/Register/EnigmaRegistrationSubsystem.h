@@ -6,7 +6,7 @@
 #include "ContentRegister.h"
 #include "EnigmaVoxel/Modules/Block/BlockRegister.h"
 #include "Subsystems/GameInstanceSubsystem.h"
-#include "RegistrationSubsystem.generated.h"
+#include "EnigmaRegistrationSubsystem.generated.h"
 
 class URegistrationDelegates;
 class UContentRegister;
@@ -32,13 +32,13 @@ public:
  * 
  */
 UCLASS(Blueprintable)
-class ENIGMAVOXEL_API URegistrationSubsystem : public UGameInstanceSubsystem
+class ENIGMAVOXEL_API UEnigmaRegistrationSubsystem : public UGameInstanceSubsystem
 {
 	GENERATED_BODY()
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "Registration")
-	static URegistrationSubsystem* GetRegistrationSubsystem();
+	static UEnigmaRegistrationSubsystem* GetRegistrationSubsystem();
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Context")
 	TMap<FString, FResourceRegister> RegisterMap;
@@ -56,6 +56,6 @@ public:
 	static UBlockDefinition* BLOCK_GET_VALUE(FString NameSpace = "Enigma", FString ID = "");
 
 private:
-	static URegistrationSubsystem* registrationSubsystem;
+	static UEnigmaRegistrationSubsystem* registrationSubsystem;
 	static URegistrationDelegates* EventDispatcher;
 };

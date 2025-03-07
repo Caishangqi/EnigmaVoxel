@@ -1,39 +1,37 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "RegistrationSubsystem.h"
+#include "EnigmaRegistrationSubsystem.h"
 
 #include "RegistrationDelegates.h"
 #include "EnigmaVoxel/EnigmaVoxel.h"
-#include "EnigmaVoxel/Core/EVGameInstance.h"
-#include "EnigmaVoxel/Core/GameInstanceDelegates.h"
 #include "EnigmaVoxel/Core/Log/DefinedLog.h"
 #include "EnigmaVoxel/Modules/Block/BlockDefinition.h"
 #include "EnigmaVoxel/Modules/Block/BlockRegister.h"
 
-URegistrationSubsystem* URegistrationSubsystem::registrationSubsystem = nullptr;
-URegistrationDelegates* URegistrationSubsystem::EventDispatcher       = nullptr;
+UEnigmaRegistrationSubsystem* UEnigmaRegistrationSubsystem::registrationSubsystem = nullptr;
+URegistrationDelegates*       UEnigmaRegistrationSubsystem::EventDispatcher       = nullptr;
 
-URegistrationSubsystem* URegistrationSubsystem::GetRegistrationSubsystem()
+UEnigmaRegistrationSubsystem* UEnigmaRegistrationSubsystem::GetRegistrationSubsystem()
 {
 	return registrationSubsystem;
 }
 
 
-void URegistrationSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+void UEnigmaRegistrationSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	registrationSubsystem = this;
 	FRegistrationDelegates::OnRegistrationInitialize.Broadcast();
-	UE_LOG(LogEnigmaVoxelRegister, Log, TEXT("Registration subsystem initialized"));
+	UE_LOG(LogEnigmaVoxelRegister, Log, TEXT("EnigmaRegistrationSubsystem::Initialize"));
 	Super::Initialize(Collection);
 }
 
-void URegistrationSubsystem::PostInitProperties()
+void UEnigmaRegistrationSubsystem::PostInitProperties()
 {
 	Super::PostInitProperties();
 }
 
-UBlockRegister* URegistrationSubsystem::BLOCK(FString NameSpace)
+UBlockRegister* UEnigmaRegistrationSubsystem::BLOCK(FString NameSpace)
 {
 	TArray<FString> Namespaces;
 	registrationSubsystem->RegisterMap.GetKeys(Namespaces);
@@ -54,7 +52,7 @@ UBlockRegister* URegistrationSubsystem::BLOCK(FString NameSpace)
 	}
 }
 
-UBlockDefinition* URegistrationSubsystem::BLOCK_GET_VALUE(FString NameSpace, FString ID)
+UBlockDefinition* UEnigmaRegistrationSubsystem::BLOCK_GET_VALUE(FString NameSpace, FString ID)
 {
 	UBlockRegister* blockRegister = BLOCK(NameSpace);
 	return Cast<UBlockDefinition>(blockRegister->GetDefinitionByID(ID));
