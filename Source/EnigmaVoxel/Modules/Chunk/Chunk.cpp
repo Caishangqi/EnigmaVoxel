@@ -176,8 +176,8 @@ void AChunk::AppendBoxWithCollision(FBlock& Block)
 	// +x faces
 	if (IsVisibleFace(Block, EBlockDirection::NORTH))
 	{
-		mesh.AppendTriangle(v0, v1, v2);
-		mesh.AppendTriangle(v0, v2, v3);
+		mesh.AppendTriangle(v1, v0, v3);
+		mesh.AppendTriangle(v1, v3, v2);
 	}
 
 	// -x faces
@@ -201,8 +201,8 @@ void AChunk::AppendBoxWithCollision(FBlock& Block)
 	// -z faces
 	if (IsVisibleFace(Block, EBlockDirection::DOWN))
 	{
-		mesh.AppendTriangle(v1, v0, v5);
-		mesh.AppendTriangle(v1, v5, v4);
+		mesh.AppendTriangle(v5, v0, v1);
+		mesh.AppendTriangle(v5, v1, v4);
 	}
 	// +z faces
 	if (IsVisibleFace(Block, EBlockDirection::UP))
@@ -210,8 +210,12 @@ void AChunk::AppendBoxWithCollision(FBlock& Block)
 		mesh.AppendTriangle(v2, v3, v6);
 		mesh.AppendTriangle(v2, v6, v7);
 	}
-	DynamicMeshComponent->SetDynamicMesh(DynamicMesh);
-	DynamicMeshComponent->UpdateCollision();
+	//DynamicMeshComponent->SetDynamicMesh(DynamicMesh);
+	DynamicMeshComponent->NotifyMeshUpdated();
+	/*
+	DynamicMeshComponent->ClearSimpleCollisionShapes(false);
+	DynamicMeshComponent->SetSimpleCollisionShapes(DynamicMeshComponent->GetSimpleCollisionShapes(),true);*/
+	//DynamicMeshComponent->UpdateCollision();
 	UE_LOG(LogEnigmaVoxelChunk, Display, TEXT("Append new Block triangles -> %s"), *Block.Coordinates.ToString());
 }
 
