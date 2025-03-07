@@ -1,8 +1,8 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "EnigmaVoxelGameMode.h"
-#include "EnigmaVoxelPlayerController.h"
-#include "EnigmaVoxelCharacter.h"
+
+#include "EnigmaVoxel/EnigmaVoxelPlayerController.h"
 #include "UObject/ConstructorHelpers.h"
 
 AEnigmaVoxelGameMode::AEnigmaVoxelGameMode()
