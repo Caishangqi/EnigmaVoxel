@@ -18,6 +18,7 @@ enum class ECollisionType: uint8
 	UNIT_BLOCK_HALF,
 	CUSTOM
 };
+
 UENUM(BlueprintType)
 enum class EBlockDirection: uint8
 {

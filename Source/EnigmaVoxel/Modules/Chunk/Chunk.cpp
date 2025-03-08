@@ -4,7 +4,7 @@
 #include "Chunk.h"
 
 #include "EnigmaVoxel/Core/Log/DefinedLog.h"
-#include "EnigmaVoxel/Core/Register/RegistrationSubsystem.h"
+#include "EnigmaVoxel/Core/Register/EnigmaRegistrationSubsystem.h"
 
 
 // Sets default values
@@ -113,7 +113,7 @@ bool AChunk::UpdateBlock(FBlock InBlockData)
 
 bool AChunk::UpdateBlockResourceLocation(FIntVector InCoords, FString Namespace, FString Path)
 {
-	UBlockDefinition* def   = URegistrationSubsystem::BLOCK_GET_VALUE(Namespace, Path);
+	UBlockDefinition* def   = UEnigmaRegistrationSubsystem::BLOCK_GET_VALUE(Namespace, Path);
 	FBlock            Block = FBlock(InCoords, def, 100);
 	return UpdateBlock(Block);
 }
