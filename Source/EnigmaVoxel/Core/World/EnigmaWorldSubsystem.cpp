@@ -43,11 +43,12 @@ UEnigmaWorld* UEnigmaWorldSubsystem::CreateEnigmaWorld(int32 WorldID)
 
 void UEnigmaWorldSubsystem::UpdateWorldTick()
 {
-	for (TTuple<int, TObjectPtr<UEnigmaWorld>> LoadedWorld : LoadedWorlds)
+	for (auto& KV : LoadedWorlds)
 	{
-		if (LoadedWorld.Value->GetEnableWorldTick())
+		UEnigmaWorld* World = KV.Value;
+		if (World && World->GetEnableWorldTick())
 		{
-			LoadedWorld.Value->UpdateStreamingChunks();
+			World->UpdateStreamingChunks();
 		}
 	}
 }
