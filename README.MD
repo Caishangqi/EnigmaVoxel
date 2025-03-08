@@ -8,7 +8,7 @@
 
 <h4 align="center">基于 Unreal Engine 5 实现体素多模型Mesh合并算法</h4>
 <p align="center">
-<a href="https://www.codefactor.io/repository/github/caishangqi/CharmingJourneyCore"><img src="https://www.codefactor.io/repository/github/caishangqi/charming-realm-system/badge" alt="CodeFactor" /></a>
+<a href="https://www.codefactor.io/repository/github/caishangqi/EnigmaVoxel"><img src="https://www.codefactor.io/repository/github/caishangqi/EnigmaVoxel/badge" alt="CodeFactor" /></a>
 <img alt="Lines of code" src="https://img.shields.io/tokei/lines/github/Caishangqi/EnigmaVoxel">
 <img alt="Lines of code" src="https://img.shields.io/badge/Unreal Engine-5.5-green">
 <img alt="GitHub branch checks state" src="https://img.shields.io/github/checks-status/Caishangqi/EnigmaVoxel/master?label=build">
@@ -49,7 +49,9 @@
 
 当前阶段拥有完整的方块注册系统，虽然还不支持方块UV和材质的渲染，但是已经支持方块的顶点生成，单个区块的重叠面优化。 同时世界子系统 `UEnigmaWorldSubsystem` 管理多个 `UEnigmaWorld` - 作为代理世界类代理原生 `UWorld`，保存当前世界加载的区块 / 在线的玩家 在每 0.05 秒一次检测中动态地基于 3x3 范围在玩家周围生成区块并且卸载区块。
 
-![Milestone Chunk Prototype](https://github.com/Caishangqi/EnigmaVoxel/blob/5fafe235e8a87f850b4bd8df092dbd2a14f384a0/Doc/res/Milestone_Chunk_Flat_Generation.gif)
+<p align="center">
+<img src = "https://github.com/Caishangqi/EnigmaVoxel/blob/5fafe235e8a87f850b4bd8df092dbd2a14f384a0/Doc/res/Milestone_Chunk_Flat_Generation.gif" alt="Milestone Chunk flat">
+</p>
 
 > 然而，该原型需要优化的地方很多，需要使用多线程技术去生成区块数据以及渲染顶点。同时还需要规定特殊地游戏机制避免在玩家离开范围后立刻删除区块，取而代之将这些方块放到 **额外的Buffer区域** 或者 **标记为不活跃** 这样当玩家在短时间内回到视野范围外的区块是不用再次进行磁盘读取和 Actor 生成步骤。
 
