@@ -24,4 +24,33 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Chunk")
 	TMap<FIntVector, TObjectPtr<AChunk>> LoadedChunks;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Chunk")
+	TArray<TObjectPtr<APawn>> Players;
+
+public:
+	UFUNCTION(BlueprintCallable, Category="World")
+	bool SetUWorldTarget(UWorld* UnrealBuildInWorld);
+	UFUNCTION(BlueprintCallable, Category="World")
+	bool SetEnableWorldTick(bool Enable = true);
+	UFUNCTION(BlueprintCallable, Category="World")
+	bool GetEnableWorldTick();
+
+	UEnigmaWorld();
+
+	UFUNCTION(BlueprintCallable, Category="World")
+	void UpdateStreamingChunks();
+
+	/// Entity Management
+	UFUNCTION(BlueprintCallable, Category="Entity Management")
+	bool AddEntity(APawn* InEntity);
+	UFUNCTION(BlueprintCallable, Category="Entity Management")
+	bool RemoveEntity(APawn* InEntity);
+
+	/// 
+
+protected:
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category="World")
+	TObjectPtr<UWorld> CurrentUWorld = nullptr;
+
+	bool EnableWorldTick = false;
 };
