@@ -42,7 +42,7 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	bool IsVisibleFace(FBlock& currentBlock, EBlockDirection InDirection);
 
-protected:
+public:
 	// Setter
 	/// Update Block by using FBlock Data, if the Block Definition inside
 	/// FBlock is null the method will return false else return true. The
@@ -69,7 +69,7 @@ protected:
 
 	/// Utility Function Right now for quickly fill the chunk with blocks
 	/// TODO: the functions inside chunk will move to world subsystem perhaps
-protected:
+public:
 	UFUNCTION(BlueprintCallable)
 	bool FillChunkWithXYZ(FIntVector fillArea, FString Namespace = "Enigma", FString Path = "");
 

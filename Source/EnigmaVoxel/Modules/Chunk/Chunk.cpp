@@ -16,6 +16,15 @@ AChunk::AChunk()
 	// Reserve the block slot
 	Blocks.Reserve(GetChunkBlockSize());
 	Blocks.Init(FBlock(), GetChunkBlockSize());
+	// Collision
+	if (DynamicMeshComponent)
+	{
+		DynamicMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		DynamicMeshComponent->SetCollisionProfileName(UCollisionProfile::NoCollision_ProfileName);
+		DynamicMeshComponent->SetGenerateOverlapEvents(false);
+		// 如果只想用简单碰撞或无碰撞，也可配置 bUseComplexAsSimpleCollision = false;
+		DynamicMeshComponent->SetComplexAsSimpleCollisionEnabled(false);
+	}
 }
 
 // Called when the game starts or when spawned
@@ -210,8 +219,8 @@ void AChunk::AppendBoxWithCollision(FBlock& Block)
 		mesh.AppendTriangle(v2, v3, v6);
 		mesh.AppendTriangle(v2, v6, v7);
 	}
-	//DynamicMeshComponent->SetDynamicMesh(DynamicMesh);
-	DynamicMeshComponent->NotifyMeshUpdated();
+	DynamicMeshComponent->SetDynamicMesh(DynamicMesh);
+	//DynamicMeshComponent->NotifyMeshUpdated();
 	/*
 	DynamicMeshComponent->ClearSimpleCollisionShapes(false);
 	DynamicMeshComponent->SetSimpleCollisionShapes(DynamicMeshComponent->GetSimpleCollisionShapes(),true);*/
