@@ -1,6 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "EnigmaVoxel/Modules/Chunk/Chunk.h"
@@ -37,8 +35,16 @@ public:
 
 	UEnigmaWorld();
 
+	/// Chunk Streaming
+
 	UFUNCTION(BlueprintCallable, Category="World")
 	void UpdateStreamingChunks();
+
+	AChunk* LoadChunk(const FIntVector& ChunkCoords);
+	bool    UnloadChunk(const FIntVector& ChunkCoords);
+
+
+	///
 
 	/// Entity Management
 	UFUNCTION(BlueprintCallable, Category="Entity Management")
@@ -48,9 +54,14 @@ public:
 
 	/// 
 
+	/// Static Method
+	UFUNCTION(BlueprintCallable)
+	static FIntVector WorldPosToChunkCoords(const FVector& WorldPos);
+	/// 
+
 protected:
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category="World")
 	TObjectPtr<UWorld> CurrentUWorld = nullptr;
 
-	bool EnableWorldTick = false;
+	bool EnableWorldTick = true;
 };
