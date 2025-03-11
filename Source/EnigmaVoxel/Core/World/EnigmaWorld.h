@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "EnigmaVoxel/Modules/Chunk/Chunk.h"
+#include "EnigmaVoxel/Modules/Chunk/ChunkData.h"
 #include "UObject/Object.h"
 #include "EnigmaWorld.generated.h"
 
@@ -24,6 +25,9 @@ public:
 	TMap<FIntVector, TObjectPtr<AChunk>> LoadedChunks;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Chunk")
 	TArray<TObjectPtr<APawn>> Players;
+	// Store [Chunk coordinates => Chunk information]
+	// Chunk information can record chunk status (UNLOADED, LOADING, LOADED), FDynamicMesh3 generated in the thread pool, etc.
+	TMap<FIntVector, FChunkInfo> ChunkMap;
 
 public:
 	UFUNCTION(BlueprintCallable, Category="World")
@@ -33,17 +37,21 @@ public:
 	UFUNCTION(BlueprintCallable, Category="World")
 	bool GetEnableWorldTick();
 
+	mutable FCriticalSection ChunkMapMutex;
+
 	UEnigmaWorld();
 
 	/// Chunk Streaming
 
 	UFUNCTION(BlueprintCallable, Category="World")
 	void UpdateStreamingChunks();
-
+	DEPRECATED_MACRO(1.2, "The Method is deprecated, please use BeginLoadChunkAsync() instead")
 	AChunk* LoadChunk(const FIntVector& ChunkCoords);
 	bool    UnloadChunk(const FIntVector& ChunkCoords);
 
-
+	// Async
+	void GenerateChunkDataAsync(FChunkData& InOutChunkData);
+	void BeginLoadChunkAsync(const FIntVector& ChunkCoords);
 	///
 
 	/// Entity Management
