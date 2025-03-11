@@ -35,7 +35,7 @@ void UEnigmaWorldSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 UEnigmaWorld* UEnigmaWorldSubsystem::CreateEnigmaWorld(int32 WorldID)
 {
-	UE_LOG(LogEnigmaVoxelWorld, Display, TEXT("Creating Enigma World, ID -> %d"), WorldID);
+	UE_LOG(LogEnigmaVoxelWorld, Display, TEXT("Creating Enigma World, ID -> %d"), WorldID)
 	UEnigmaWorld* result = NewObject<UEnigmaWorld>(this);
 	LoadedWorlds.Add(WorldID, result);
 	return result;
