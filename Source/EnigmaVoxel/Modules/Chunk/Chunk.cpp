@@ -47,12 +47,6 @@ FBlock& AChunk::GetBlockAt(FIntVector InCoords)
 
 int32 AChunk::GetBlockIndexAt(FIntVector InCoords)
 {
-	/*
-	check(InCoords.X >= 0 && InCoords.X < ChunkDimension.X);
-	check(InCoords.Y >= 0 && InCoords.Y < ChunkDimension.Y);
-	check(InCoords.Z >= 0 && InCoords.Z < ChunkDimension.Z);
-	*/
-
 	return InCoords.X
 		+ InCoords.Y * ChunkDimension.X
 		+ InCoords.Z * ChunkDimension.X * ChunkDimension.Y;
@@ -112,7 +106,7 @@ bool AChunk::IsVisibleFace(FBlock& currentBlock, EBlockDirection InDirection)
 bool AChunk::UpdateBlock(FBlock InBlockData)
 {
 	Blocks[GetBlockIndexAt(InBlockData.Coordinates)] = InBlockData;
-	UE_LOG(LogEnigmaVoxelChunk, Log, TEXT("UpdateBlock in Chunk -> %s at -> %s"), *GetName(), *InBlockData.Coordinates.ToString())
+	//UE_LOG(LogEnigmaVoxelChunk, Log, TEXT("UpdateBlock in Chunk -> %s at -> %s"), *GetName(), *InBlockData.Coordinates.ToString())
 	if (InBlockData.Definition == nullptr)
 	{
 		return false;

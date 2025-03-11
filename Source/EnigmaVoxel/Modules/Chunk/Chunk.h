@@ -7,6 +7,7 @@
 #include "Runtime/GeometryFramework/Public/DynamicMeshActor.h"
 #include "Chunk.generated.h"
 
+
 UCLASS()
 class ENIGMAVOXEL_API AChunk : public ADynamicMeshActor
 {
