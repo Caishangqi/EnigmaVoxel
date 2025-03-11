@@ -59,7 +59,7 @@ EnigmaVoxel is a voxel-based terrain system for Unreal Engine 5.5, featuring dyn
 `GenerateChunkDataAsync()` 生成该区块坐标所需要的的所有数据并在线程函数的回调时在主线程生成AChunk Actor。
 
 <p align="center">
-<img src = "https://github.com/Caishangqi/EnigmaVoxel/blob/5fafe235e8a87f850b4bd8df092dbd2a14f384a0/Doc/res/Milestone_Chunk_16x8_Asyn.gif" alt="Milestone Chunk flat">
+<img src = "https://github.com/Caishangqi/EnigmaVoxel/blob/53ec02f39083d8b1740c5533eeeead407e938c91/Doc/res/Milestone_Chunk_16x8_Asyn.gif" alt="Milestone Async Chunk generation">
 </p>
 
 > 当前阶段任然要处理渲染细节上的问题例如，当区块生成的时候是否要生成相接区域方块的面，这样可以保证在视觉效果上美观。
