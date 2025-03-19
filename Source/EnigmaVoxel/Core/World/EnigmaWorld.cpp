@@ -31,6 +31,11 @@ bool UEnigmaWorld::GetEnableWorldTick()
 	return EnableWorldTick;
 }
 
+void UEnigmaWorld::NotifyNeighborsChunkLoaded(FIntVector ChunkCoords)
+{
+	
+}
+
 UEnigmaWorld::UEnigmaWorld()
 {
 }
@@ -238,6 +243,7 @@ void UEnigmaWorld::BeginLoadChunkAsync(const FIntVector& ChunkCoords)
 
 			      // Update LoadedChunksMap (or LoadedChunks) to manage
 			      LoadedChunks.Add(ChunkCoords, NewChunkActor);
+			      NotifyNeighborsChunkLoaded(ChunkCoords);
 			      UE_LOG(LogEnigmaVoxelChunk, Display, TEXT("Loaded Chunk at ChunkPos= [ %s ]"), *ChunkCoords.ToString())
 		      });
 	      });

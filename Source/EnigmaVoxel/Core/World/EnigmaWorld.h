@@ -19,6 +19,8 @@ class ENIGMAVOXEL_API UEnigmaWorld : public UObject
 	GENERATED_BODY()
 
 public:
+	UEnigmaWorld();
+
 	virtual UWorld* GetWorld() const override;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Chunk")
@@ -29,6 +31,8 @@ public:
 	// Chunk information can record chunk status (UNLOADED, LOADING, LOADED), FDynamicMesh3 generated in the thread pool, etc.
 	TMap<FIntVector, FChunkInfo> ChunkMap;
 
+	mutable FCriticalSection ChunkMapMutex;
+
 public:
 	UFUNCTION(BlueprintCallable, Category="World")
 	bool SetUWorldTarget(UWorld* UnrealBuildInWorld);
@@ -37,9 +41,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category="World")
 	bool GetEnableWorldTick();
 
-	mutable FCriticalSection ChunkMapMutex;
-
-	UEnigmaWorld();
+	/// Notify
+	void NotifyNeighborsChunkLoaded(FIntVector ChunkCoords);
 
 	/// Chunk Streaming
 
