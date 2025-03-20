@@ -6,7 +6,7 @@
 <img src = "https://i.imgur.com/EF6t6WA.png" alt="">
 </p>
 
-<h4 align="center">基于 Unreal Engine 5 实现体素多模型Mesh合并算法</h4>
+<h4 align="center">A Topdown voxel RPG game that focus on chunk system and world generation</h4>
 <p align="center">
 <a href="https://www.codefactor.io/repository/github/caishangqi/EnigmaVoxel"><img src="https://www.codefactor.io/repository/github/caishangqi/EnigmaVoxel/badge" alt="CodeFactor" /></a>
 <img alt="Lines of code" src="https://img.shields.io/tokei/lines/github/Caishangqi/EnigmaVoxel">
@@ -29,6 +29,7 @@ noise-based world generation.
 - 世界子系统 `UEnigmaWorldSubsystem`,区块 `UChunk`，和游戏世界 `UEnigmaWorld` 结构设计，包括其函数和生命周期管理
 - 基于玩家当前位置动态加载 / 卸载 区块 (主线程)
 - 抽象Chunk数据至`FChunkData`，包含所需要构建的`FDynamicMesh`和方块信息，这些内容可以被线程池抽离计算并在最后提交给主线程生成 `AChunk` Actor
+- 方块局部坐标(区块) 和 世界坐标(世界) 直接的转换,方块的`Get()`函数
 
 - *区块系统所需要的函数比如说 /setblock `<block>` `<xyz>`*
 - *方块局部坐标(区块) 和 世界坐标(世界) 直接的转换, 实现区块加载后通知周围区块重构顶点*
