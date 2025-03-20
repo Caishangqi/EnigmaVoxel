@@ -6,6 +6,12 @@
 #include "Engine/GameInstance.h"
 #include "EVGameInstance.generated.h"
 
+constexpr int32 ChunkBlockXCount = 16;
+constexpr int32 ChunkBlockYCount = 16;
+constexpr int32 ChunkBlockZCount = 16;
+constexpr float BlockWorldSize   = 100.f;
+constexpr float ChunkWorldSize   = BlockWorldSize * ChunkBlockXCount;
+
 class UGameInstanceEventDispatcher;
 /**
  * 
@@ -22,7 +28,7 @@ public:
 public:
 	UFUNCTION(BlueprintNativeEvent)
 	void OnRegistrationInitialize();
-	
+
 private:
 	static TObjectPtr<UEVGameInstance> GameInstance;
 
