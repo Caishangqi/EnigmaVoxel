@@ -41,6 +41,20 @@ public:
 	UFUNCTION(BlueprintCallable, Category="World")
 	bool GetEnableWorldTick();
 
+	/// Query
+	UFUNCTION(BlueprintCallable, Category="Query")
+	static FIntVector WorldPosToChunkCoords(const FVector& WorldPos);
+	UFUNCTION(BlueprintCallable, Category="Query")
+	static FIntVector BlockPosToChunkCoords(const FIntVector& BlockPos);
+	UFUNCTION(BlueprintCallable, Category="Query")
+	static FIntVector WorldPosToChunkLocalCoords(const FVector& WorldPos);
+	UFUNCTION(BlueprintCallable, Category="Query")
+	static FIntVector BlockPosToChunkLocalCoords(const FIntVector& BlockPos);
+	UFUNCTION(BlueprintCallable, Category="Query")
+	UBlockDefinition* GetBlockAtWorldPos(const FVector& WorldPos);
+	UFUNCTION(BlueprintCallable, Category="Query")
+	UBlockDefinition* GetBlockAtBlockPos(const FIntVector& BlockPos);
+
 	/// Notify
 	void NotifyNeighborsChunkLoaded(FIntVector ChunkCoords);
 
@@ -53,6 +67,7 @@ public:
 	bool    UnloadChunk(const FIntVector& ChunkCoords);
 
 	// Async
+	void RebuildChunkMeshData(FChunkData& InOutChunkData);
 	void GenerateChunkDataAsync(FChunkData& InOutChunkData);
 	void BeginLoadChunkAsync(const FIntVector& ChunkCoords);
 	///
@@ -65,10 +80,6 @@ public:
 
 	/// 
 
-	/// Static Method
-	UFUNCTION(BlueprintCallable)
-	static FIntVector WorldPosToChunkCoords(const FVector& WorldPos);
-	/// 
 
 protected:
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category="World")

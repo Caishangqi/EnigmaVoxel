@@ -3,6 +3,7 @@
 
 #include "EnigmaWorld.h"
 
+#include "EnigmaVoxel/Core/EVGameInstance.h"
 #include "EnigmaVoxel/Core/Log/DefinedLog.h"
 
 UWorld* UEnigmaWorld::GetWorld() const
@@ -31,9 +32,28 @@ bool UEnigmaWorld::GetEnableWorldTick()
 	return EnableWorldTick;
 }
 
+/// Notify other chunks that are near the loaded chunk.
+/// mark them dirty if they are loaded because they need to
+/// rebuild the vertices to cull the edge
+/// @param ChunkCoords 
 void UEnigmaWorld::NotifyNeighborsChunkLoaded(FIntVector ChunkCoords)
 {
-	
+	static const TArray<FIntVector> Directions = {
+		FIntVector(1, 0, 0), FIntVector(-1, 0, 0),
+		FIntVector(0, 1, 0), FIntVector(0, -1, 0)
+	};
+	for (const FIntVector& Dir : Directions)
+	{
+		FIntVector neighborCoords = ChunkCoords + Dir;
+		if (FChunkInfo* NeighborInfoPtr = ChunkMap.Find(neighborCoords))
+		{
+			// 如果邻居正处于LOADED状态，就标记为dirty
+			if (NeighborInfoPtr->LoadState == EChunkLoadState::LOADED)
+			{
+				NeighborInfoPtr->bIsDirty = true;
+			}
+		}
+	}
 }
 
 UEnigmaWorld::UEnigmaWorld()
@@ -76,6 +96,18 @@ void UEnigmaWorld::UpdateStreamingChunks()
 
 	TSet<FIntVector> ToLoad   = DesiredChunkCoords.Difference(ExistingChunks);
 	TSet<FIntVector> ToUnload = ExistingChunks.Difference(DesiredChunkCoords);
+
+	// TODO: Chunk rebuild
+	for (auto& KV : ChunkMap)
+	{
+		FIntVector  ChunkCoords = KV.Key;
+		FChunkInfo& Info        = KV.Value;
+		if (Info.bIsDirty && Info.LoadState == EChunkLoadState::LOADED)
+		{
+			// 调用你的异步逻辑 or 同步重建网格
+			Info.bIsDirty = false;
+		}
+	}
 
 	for (const FIntVector& ChunkCoords : ToLoad)
 	{
@@ -132,6 +164,10 @@ bool UEnigmaWorld::UnloadChunk(const FIntVector& ChunkCoords)
 	ChunkMap.Remove(ChunkCoords);
 	UE_LOG(LogEnigmaVoxelChunk, Display, TEXT("Unloaded Chunk at ChunkPos= [ %s ]"), *ChunkCoords.ToString())
 	return true;
+}
+
+void UEnigmaWorld::RebuildChunkMeshData(FChunkData& InOutChunkData)
+{
 }
 
 void UEnigmaWorld::GenerateChunkDataAsync(FChunkData& InOutChunkData)
@@ -271,12 +307,79 @@ bool UEnigmaWorld::RemoveEntity(APawn* InEntity)
 
 FIntVector UEnigmaWorld::WorldPosToChunkCoords(const FVector& WorldPos)
 {
-	static constexpr int32 ChunkBlockCount = 16;
-	static constexpr float BlockWorldSize  = 100.f;
-
-	float ChunkWorldSize = ChunkBlockCount * BlockWorldSize;
-	int32 ChunkX         = (int32)FMath::FloorToInt(WorldPos.X / ChunkWorldSize);
-	int32 ChunkY         = (int32)FMath::FloorToInt(WorldPos.Y / ChunkWorldSize);
-
+	int32 ChunkX = (int32)FMath::FloorToInt(WorldPos.X / ChunkWorldSize);
+	int32 ChunkY = (int32)FMath::FloorToInt(WorldPos.Y / ChunkWorldSize);
 	return FIntVector(ChunkX, ChunkY, 0);
+}
+
+FIntVector UEnigmaWorld::BlockPosToChunkCoords(const FIntVector& BlockPos)
+{
+	return WorldPosToChunkCoords(FVector((float)BlockPos.X * BlockWorldSize, (float)BlockPos.Y * BlockWorldSize, (float)BlockPos.Z * BlockWorldSize));
+}
+
+FIntVector UEnigmaWorld::WorldPosToChunkLocalCoords(const FVector& WorldPos)
+{
+	FIntVector chunkCoords = WorldPosToChunkCoords(WorldPos);
+	// 计算 chunkWorldOrigin = (chunkCoords * ChunkWorldSize)
+	FVector chunkWorldOrigin(float(chunkCoords.X) * ChunkWorldSize, float(chunkCoords.Y) * ChunkWorldSize, 0.f);
+	// 然后 (WorldPos - chunkWorldOrigin) / BlockWorldSize 就是相对于 chunk 的本地 block 索引
+	float localBlockX = (float)(WorldPos.X - chunkWorldOrigin.X) / BlockWorldSize;
+	float localBlockY = (float)(WorldPos.Y - chunkWorldOrigin.Y) / BlockWorldSize;
+	float localBlockZ = (float)(WorldPos.Z - chunkWorldOrigin.Z) / BlockWorldSize;
+
+	int32 lx = FMath::FloorToInt(localBlockX); // 0 ~ 15
+	int32 ly = FMath::FloorToInt(localBlockY); // 0 ~ 15
+	int32 lz = FMath::FloorToInt(localBlockZ); // 0 ~ 15
+
+	auto modChunk = [=](int32 v) { return (v % ChunkBlockXCount + ChunkBlockYCount) % ChunkBlockZCount; };
+
+	lx = modChunk(lx);
+	ly = modChunk(ly);
+	lz = modChunk(lz);
+
+	return FIntVector(lx, ly, lz);
+}
+
+FIntVector UEnigmaWorld::BlockPosToChunkLocalCoords(const FIntVector& BlockPos)
+{
+	return WorldPosToChunkLocalCoords(FVector((float)BlockPos.X * BlockWorldSize, (float)BlockPos.Y * BlockWorldSize, (float)BlockPos.Z * BlockWorldSize));
+}
+
+UBlockDefinition* UEnigmaWorld::GetBlockAtWorldPos(const FVector& WorldPos)
+{
+	FIntVector chunkCoords = WorldPosToChunkCoords(WorldPos);
+
+	// 如果不存在或尚未加载
+	if (!ChunkMap.Contains(chunkCoords))
+	{
+		return nullptr; // 表示此处是“空气”或区块不存在
+	}
+	FChunkInfo& info = ChunkMap[chunkCoords];
+	if (info.LoadState != EChunkLoadState::LOADED)
+	{
+		return nullptr; // 区块还没加载完，也当成空气处理
+	}
+
+	// 获取在这个区块内的局部坐标
+	FIntVector localCoords = WorldPosToChunkLocalCoords(WorldPos);
+	// 这里最好先检查 localCoords 是否都在 [0..15]
+	if (localCoords.X < 0 || localCoords.X >= info.ChunkData.ChunkDimension.X ||
+		localCoords.Y < 0 || localCoords.Y >= info.ChunkData.ChunkDimension.Y ||
+		localCoords.Z < 0 || localCoords.Z >= info.ChunkData.ChunkDimension.Z)
+	{
+		return nullptr;
+	}
+
+	// 获取此处的方块
+	const FBlock& blockData = info.ChunkData.GetBlock(localCoords);
+	if (!blockData.Definition)
+	{
+		return nullptr;
+	}
+	return blockData.Definition;
+}
+
+UBlockDefinition* UEnigmaWorld::GetBlockAtBlockPos(const FIntVector& BlockPos)
+{
+	return GetBlockAtWorldPos(FVector((float)BlockPos.X * BlockWorldSize, (float)BlockPos.Y * BlockWorldSize, (float)BlockPos.Z * BlockWorldSize));
 }
