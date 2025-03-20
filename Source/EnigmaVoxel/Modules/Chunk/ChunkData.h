@@ -67,6 +67,7 @@ struct FChunkInfo
 {
 	EChunkLoadState LoadState;
 	FChunkData      ChunkData;
+	bool            bIsDirty = false; // Need mesh rebuild
 
 	FChunkInfo()
 		: LoadState(EChunkLoadState::UNLOADED)
