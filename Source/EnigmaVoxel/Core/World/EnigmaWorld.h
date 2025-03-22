@@ -67,7 +67,7 @@ public:
 	bool    UnloadChunk(const FIntVector& ChunkCoords);
 
 	// Async
-	void RebuildChunkMeshData(FChunkData& InOutChunkData);
+	void RebuildChunkMeshData(FChunkInfo& InOutChunkInfo);
 	void GenerateChunkDataAsync(FChunkData& InOutChunkData);
 	void BeginLoadChunkAsync(const FIntVector& ChunkCoords);
 	///
