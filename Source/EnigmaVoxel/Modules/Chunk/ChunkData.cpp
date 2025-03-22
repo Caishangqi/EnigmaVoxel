@@ -2,6 +2,7 @@
 
 #include "EnigmaVoxel/Core/Log/DefinedLog.h"
 #include "EnigmaVoxel/Core/Register/EnigmaRegistrationSubsystem.h"
+#include "EnigmaVoxel/Core/World/EnigmaWorld.h"
 
 FChunkData::FChunkData(): ChunkCoords(FIntVector::ZeroValue)
                           , ChunkDimension(FIntVector(16, 16, 16))
@@ -57,6 +58,13 @@ bool FChunkData::FillChunkWithArea(FIntVector fillArea, FString Namespace, FStri
 	return true;
 }
 
+/// return whether or not the block in the Chunk's facing is visible in chunk local space
+/// @param ChunkData the ChunkData
+/// @param x the block local x coordinate
+/// @param y the block local y coordinate
+/// @param z the block local z coordinate
+/// @param Direction The 6 freedom direction
+/// @return Whether or not the current Direction is visible for player
 bool IsFaceVisibleInChunkData(const FChunkData& ChunkData, int x, int y, int z, EBlockDirection Direction)
 {
 	FIntVector3 blockPos(x, y, z);
@@ -108,6 +116,153 @@ bool IsFaceVisibleInChunkData(const FChunkData& ChunkData, int x, int y, int z, 
 	return false;
 }
 
+/// return whether or not the block in the Chunk's facing is visible in world space
+/// This method especially check the neighbourhood chunk edge cases, so it need an additional
+/// UEnigmaWorld pointer.
+/// @param World the UEnigmaWorld pointer that the chunk current in (and loaded)
+/// @param ChunkData the ChunkData
+/// @param x the block local x coordinate
+/// @param y the block local y coordinate
+/// @param z the block local z coordinate
+/// @param Direction The 6 freedom direction
+/// @return Whether or not the current Direction is visible for player
+bool IsFaceVisible(UEnigmaWorld* World, const FChunkData& ChunkData, int x, int y, int z, EBlockDirection Direction)
+{
+	const FIntVector& Dim = ChunkData.ChunkDimension;
+	// ap the local coordinates (x, y, z) in the current block to the global block coordinates (block-based)
+	auto GetGlobalBlockCoords = [&](int LocalX, int LocalY, int LocalZ)
+	{
+		int GlobalX = ChunkData.ChunkCoords.X * Dim.X + LocalX;
+		int GlobalY = ChunkData.ChunkCoords.Y * Dim.Y + LocalY;
+		int GlobalZ = ChunkData.ChunkCoords.Z * Dim.Z + LocalZ;
+		return FIntVector(GlobalX, GlobalY, GlobalZ);
+	};
+
+	switch (Direction)
+	{
+	// +X
+	case EBlockDirection::NORTH:
+		{
+			// Determine whether to cross the X range of this Chunk
+			if (x + 1 >= Dim.X)
+			{
+				FIntVector        neighborGlobalPos = GetGlobalBlockCoords(x + 1, y, z);
+				UBlockDefinition* neighborDef       = World->GetBlockAtBlockPos(neighborGlobalPos);
+				// If the neighbor block is empty (or the neighbor block is not loaded => return nullptr) => visible
+				return (neighborDef == nullptr);
+			}
+			else
+			{
+				// Inside this Chunk => directly look at the adjacent blocks
+				if (ChunkData.GetBlock(FIntVector(x + 1, y, z)).Definition == nullptr)
+					return true; // air => visible
+				return false; // solid => invisible (need culled)
+			}
+		}
+	// break; // not strictly needed if we return
+
+	// -X
+	case EBlockDirection::SOUTH:
+		{
+			if (x - 1 < 0)
+			{
+				// 跨区块
+				FIntVector        neighborGlobalPos = GetGlobalBlockCoords(x - 1, y, z);
+				UBlockDefinition* neighborDef       = World->GetBlockAtBlockPos(neighborGlobalPos);
+				return (neighborDef == nullptr);
+			}
+			else
+			{
+				// 本 Chunk
+				if (ChunkData.GetBlock(FIntVector(x - 1, y, z)).Definition == nullptr)
+					return true;
+				return false;
+			}
+		}
+
+	// +Y
+	case EBlockDirection::EAST:
+		{
+			if (y + 1 >= Dim.Y)
+			{
+				FIntVector        neighborGlobalPos = GetGlobalBlockCoords(x, y + 1, z);
+				UBlockDefinition* neighborDef       = World->GetBlockAtBlockPos(neighborGlobalPos);
+				return (neighborDef == nullptr);
+			}
+			else
+			{
+				if (ChunkData.GetBlock(FIntVector(x, y + 1, z)).Definition == nullptr)
+					return true;
+				return false;
+			}
+		}
+
+	// -Y
+	case EBlockDirection::WEST:
+		{
+			if (y - 1 < 0)
+			{
+				FIntVector        neighborGlobalPos = GetGlobalBlockCoords(x, y - 1, z);
+				UBlockDefinition* neighborDef       = World->GetBlockAtBlockPos(neighborGlobalPos);
+				return (neighborDef == nullptr);
+			}
+			else
+			{
+				if (ChunkData.GetBlock(FIntVector(x, y - 1, z)).Definition == nullptr)
+					return true;
+				return false;
+			}
+		}
+
+	// +Z
+	case EBlockDirection::UP:
+		{
+			if (z + 1 >= Dim.Z)
+			{
+				FIntVector        neighborGlobalPos = GetGlobalBlockCoords(x, y, z + 1);
+				UBlockDefinition* neighborDef       = World->GetBlockAtBlockPos(neighborGlobalPos);
+				return (neighborDef == nullptr);
+			}
+			else
+			{
+				if (ChunkData.GetBlock(FIntVector(x, y, z + 1)).Definition == nullptr)
+					return true;
+				return false;
+			}
+		}
+
+	// -Z
+	case EBlockDirection::DOWN:
+		{
+			if (z - 1 < 0)
+			{
+				FIntVector        neighborGlobalPos = GetGlobalBlockCoords(x, y, z - 1);
+				UBlockDefinition* neighborDef       = World->GetBlockAtBlockPos(neighborGlobalPos);
+				return (neighborDef == nullptr);
+			}
+			else
+			{
+				if (ChunkData.GetBlock(FIntVector(x, y, z - 1)).Definition == nullptr)
+					return true;
+				return false;
+			}
+		}
+	default:
+		return false;
+	}
+}
+
+
+/// Append Box to current Chunk dynamic mesh, this method would also
+/// append additional Collision verts into Collision dynamic mesh.
+/// The condition of collision will dependent on block definition properties
+/// 
+/// The method is not handle cross visibility between neighbour chunks, this
+/// method only handle the visibility of chunk local space, and automatically treat
+/// edge chunk blocks as visible if you need the check please use the overloaded method with World parameter
+/// @param Mesh 
+/// @param Block The Block slot of The chunk
+/// @param ChunkData 
 void AppendBoxForBlock(UE::Geometry::FDynamicMesh3& Mesh, const FBlock& Block, const FChunkData& ChunkData)
 {
 	const FIntVector blockPos = Block.Coordinates;
@@ -163,6 +318,75 @@ void AppendBoxForBlock(UE::Geometry::FDynamicMesh3& Mesh, const FBlock& Block, c
 
 	// +Z faces => EBlockDirection::UP
 	if (IsFaceVisibleInChunkData(ChunkData, blockPos.X, blockPos.Y, blockPos.Z, EBlockDirection::UP))
+	{
+		Mesh.AppendTriangle(v2, v3, v6);
+		Mesh.AppendTriangle(v2, v6, v7);
+	}
+}
+
+/// Append Box to current Chunk dynamic mesh, this method would also
+/// append additional Collision verts into Collision dynamic mesh.
+/// The condition of collision will dependent on block definition properties
+///
+/// The additional World parameter is used to check the visibility of the block in the world space.
+/// @param World 
+/// @param Mesh 
+/// @param Block 
+/// @param ChunkData 
+void AppendBoxForBlock(UEnigmaWorld* World, UE::Geometry::FDynamicMesh3& Mesh, const FBlock& Block, const FChunkData& ChunkData)
+{
+	const FIntVector blockPos = Block.Coordinates;
+	// Calculate the diagonal point of the block in the world
+	float   BlockSize = ChunkData.BlockSize;
+	FVector blockMinPt(float(blockPos.X) * BlockSize, float(blockPos.Y) * BlockSize, float(blockPos.Z) * BlockSize);
+	FVector blockMaxPt(blockMinPt.X + BlockSize, blockMinPt.Y + BlockSize, blockMinPt.Z + BlockSize);
+
+	int32 v0 = Mesh.AppendVertex(FVector3d(blockMaxPt.X, blockMinPt.Y, blockMinPt.Z));
+	int32 v1 = Mesh.AppendVertex(FVector3d(blockMaxPt.X, blockMaxPt.Y, blockMinPt.Z));
+	int32 v2 = Mesh.AppendVertex(FVector3d(blockMaxPt.X, blockMaxPt.Y, blockMaxPt.Z));
+	int32 v3 = Mesh.AppendVertex(FVector3d(blockMaxPt.X, blockMinPt.Y, blockMaxPt.Z));
+	int32 v4 = Mesh.AppendVertex(FVector3d(blockMinPt.X, blockMaxPt.Y, blockMinPt.Z));
+	int32 v5 = Mesh.AppendVertex(FVector3d(blockMinPt.X, blockMinPt.Y, blockMinPt.Z));
+	int32 v6 = Mesh.AppendVertex(FVector3d(blockMinPt.X, blockMinPt.Y, blockMaxPt.Z));
+	int32 v7 = Mesh.AppendVertex(FVector3d(blockMinPt.X, blockMaxPt.Y, blockMaxPt.Z));
+
+	// +X => EBlockDirection::NORTH
+	if (IsFaceVisible(World, ChunkData, blockPos.X, blockPos.Y, blockPos.Z, EBlockDirection::NORTH))
+	{
+		Mesh.AppendTriangle(v1, v0, v3);
+		Mesh.AppendTriangle(v1, v3, v2);
+	}
+
+	// -X => EBlockDirection::SOUTH
+	if (IsFaceVisible(World, ChunkData, blockPos.X, blockPos.Y, blockPos.Z, EBlockDirection::SOUTH))
+	{
+		Mesh.AppendTriangle(v5, v4, v7);
+		Mesh.AppendTriangle(v5, v7, v6);
+	}
+
+	// +Y => EBlockDirection::EAST
+	if (IsFaceVisible(World, ChunkData, blockPos.X, blockPos.Y, blockPos.Z, EBlockDirection::EAST))
+	{
+		Mesh.AppendTriangle(v4, v1, v2);
+		Mesh.AppendTriangle(v4, v2, v7);
+	}
+
+	// -Y => EBlockDirection::WEST
+	if (IsFaceVisible(World, ChunkData, blockPos.X, blockPos.Y, blockPos.Z, EBlockDirection::WEST))
+	{
+		Mesh.AppendTriangle(v0, v5, v6);
+		Mesh.AppendTriangle(v0, v6, v3);
+	}
+
+	// -Z => EBlockDirection::DOWN
+	if (IsFaceVisible(World, ChunkData, blockPos.X, blockPos.Y, blockPos.Z, EBlockDirection::DOWN))
+	{
+		Mesh.AppendTriangle(v5, v0, v1);
+		Mesh.AppendTriangle(v5, v1, v4);
+	}
+
+	// +Z => EBlockDirection::UP
+	if (IsFaceVisible(World, ChunkData, blockPos.X, blockPos.Y, blockPos.Z, EBlockDirection::UP))
 	{
 		Mesh.AppendTriangle(v2, v3, v6);
 		Mesh.AppendTriangle(v2, v6, v7);

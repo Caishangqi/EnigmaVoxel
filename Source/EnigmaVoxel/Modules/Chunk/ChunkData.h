@@ -4,6 +4,8 @@
 #include "ChunkData.generated.h"
 
 
+class UEnigmaWorld;
+
 enum class EChunkLoadState: uint8
 {
 	UNLOADED = 0,
@@ -75,23 +77,7 @@ struct FChunkInfo
 	}
 };
 
-/// return whether or not the block in the Chunk's facing is visible
-/// @param ChunkData the ChunkData
-/// @param x the block local x coordinate
-/// @param y the block local y coordinate
-/// @param z the block local z coordinate
-/// @param Direction The 6 freedom direction
-/// @return Whether or not the current Direction is visible for player
-bool IsFaceVisibleInChunkData(
-	const FChunkData& ChunkData,
-	int               x, int y, int z,
-	EBlockDirection   Direction);
-
-/// Append Box to current Chunk dynamic mesh, this method would also
-/// append additional Collision verts into Collision dynamic mesh.
-/// The condition of collision will dependent on block definition properties
-/// @param Block The Block slot of The chunk
-void AppendBoxForBlock(
-	UE::Geometry::FDynamicMesh3& Mesh,
-	const FBlock&                Block,
-	const FChunkData&            ChunkData);
+bool IsFaceVisibleInChunkData(const FChunkData& ChunkData, int x, int y, int z, EBlockDirection Direction);
+bool IsFaceVisible(UEnigmaWorld* World, const FChunkData& ChunkData, int x, int y, int z, EBlockDirection Direction);
+void AppendBoxForBlock(UE::Geometry::FDynamicMesh3& Mesh, const FBlock& Block, const FChunkData& ChunkData);
+void AppendBoxForBlock(UEnigmaWorld* World, UE::Geometry::FDynamicMesh3& Mesh, const FBlock& Block, const FChunkData& ChunkData);
