@@ -15,13 +15,19 @@ public:
 	UPROPERTY(BlueprintReadWrite)
 	TObjectPtr<UBlockDefinition> Definition = nullptr;
 
-	// 方块在世界或区块中的坐标（例如使用整数坐标）
+	// The block's coordinates in chunk
 	UPROPERTY(BlueprintReadWrite)
 	FIntVector Coordinates = FIntVector(0, 0, 0);
 
-	// 例如方块的当前健康值
+	// TODO: May Add and Maintain the Block World integer position
+
+	// The current health of the block
 	UPROPERTY(BlueprintReadWrite)
 	int32 Health = 100;
+
+	// Record the current status of the block
+	UPROPERTY()
+	int32 StateID = 0;
 
 	FBlock()
 		: Definition(nullptr)
