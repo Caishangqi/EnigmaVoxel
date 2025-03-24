@@ -72,6 +72,16 @@ noise-based world generation.
 > 当前阶段任然要处理渲染细节上的问题例如，当区块生成的时候是否要生成相接区域方块的面，这样可以保证在视觉效果上美观。
 > 当加载完毕时则需重新更新一次FDynamicMesh来剔除那些在区块连接处的重叠的面。(不过这是纯美观层面)
 
+### Prototype: 区块加载后剔除相邻面
+当前阶段实现了区块在加载完毕后通知相邻区块`NotifyNeighborsChunkLoaded()`重新更新自己的vertices的步骤`RebuildChunkMeshData()`。这里没有使用`AChunk`来监听加载事件是因为在
+`UEnigmaWorld`中我们能知道当前所有区块加载的状态而`AChunk`的生命周期往往要比`UEnigmaWorld`慢。(因为它是Unreal Engine的Actor并非纯数据对象)
+
+<p align="center">
+<img src = "https://github.com/Caishangqi/EnigmaVoxel/blob/6c45ca2dd1a3ae9145c32cd462228f6d4c61e696/Doc/res/Milestone_Chunk_neibour_culling.gif" alt="Milestone Chunk Neighbour Culling">
+</p>
+
+> 当前阶段没有性能问题但是仍然需要时刻注意这类问题的隐患，例如，如果一个方块被玩家破坏了，那么它周围的方块的顶点也需要重新计算，这可能会导致性能问题。不过该优化在贴图实现里程碑之后。
+
 ## 特别说明
 
 这是一个实验为准的项目，请不要对他保有太多的期待，主要内容会依照我觉得重要的部分进行开发，您的需求可能会被延后，感谢谅解。
