@@ -3,7 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "BlockState.h"
 #include "EnigmaVoxel/Core/Register/Definition.h"
+#include "Enum/CollisionType.h"
 #include "UObject/Object.h"
 #include "BlockDefinition.generated.h"
 
@@ -11,24 +13,6 @@
 /**
  * 
  */
-UENUM(BlueprintType)
-enum class ECollisionType: uint8
-{
-	UNIT_BLOCK,
-	UNIT_BLOCK_HALF,
-	CUSTOM
-};
-
-UENUM(BlueprintType)
-enum class EBlockDirection: uint8
-{
-	NORTH,
-	SOUTH,
-	EAST,
-	WEST,
-	UP,
-	DOWN
-};
 
 UCLASS(Blueprintable, BlueprintType)
 class ENIGMAVOXEL_API UBlockDefinition : public UDefinition
@@ -48,8 +32,17 @@ public:
 	ECollisionType CollisionType = ECollisionType::UNIT_BLOCK;
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category="Block Definition")
 	bool bIsOpaque = false;
+
+	/// Deprecated: Use BlockState instead
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block Definition")
 	TObjectPtr<UStaticMeshComponent> Model;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Block Definition")
+	TMap<int32, FBlockState> StateVariants;
+
+	// Indicates which StateID this block uses by default when placed/loaded
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Block Definition")
+	int32 DefaultStateID = 0;
 
 public:
 	/// We like Minecraft so we use their method
