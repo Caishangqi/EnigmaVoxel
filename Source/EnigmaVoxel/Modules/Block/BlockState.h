@@ -16,5 +16,5 @@ public:
 
 	// Or store texture/material information, such as the material of the six faces, UV offset, etc.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TMap<EBlockDirection, UMaterialInterface*> FaceMaterials;
+	TMap<EBlockDirection, UTexture2D*> FaceMaterials;
 };
