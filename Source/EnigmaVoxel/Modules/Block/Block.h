@@ -25,6 +25,11 @@ public:
 	UPROPERTY(BlueprintReadWrite)
 	int32 Health = 100;
 
+	// Which Variant key in block state should the current block use
+	// For example, "" or "facing=north", etc.
+	UPROPERTY()
+	FString BlockStateKey = "";
+
 	// Record the current status of the block
 	UPROPERTY()
 	int32 StateID = 0;
