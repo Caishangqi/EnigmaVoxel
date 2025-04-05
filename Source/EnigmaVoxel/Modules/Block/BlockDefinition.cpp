@@ -5,5 +5,4 @@
 
 UBlockDefinition::UBlockDefinition()
 {
-	Model = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Model"));
 }

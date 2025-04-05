@@ -32,11 +32,7 @@ public:
 	ECollisionType CollisionType = ECollisionType::UNIT_BLOCK;
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category="Block Definition")
 	bool bIsOpaque = false;
-
-	/// Deprecated: Use BlockState instead
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block Definition")
-	TObjectPtr<UStaticMeshComponent> Model;
-
+	
 	///If you want to distinguish multiple block states files like Minecraft (such as multiple "subtypes"), you can also change
 	///it to TArray<FBlockState> or TMap<FString, FBlockState>; but most of the time "one block → one block state + multiple
 	///variants" is enough.
