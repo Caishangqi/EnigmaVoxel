@@ -37,8 +37,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block Definition")
 	TObjectPtr<UStaticMeshComponent> Model;
 
+	///If you want to distinguish multiple block states files like Minecraft (such as multiple "subtypes"), you can also change
+	///it to TArray<FBlockState> or TMap<FString, FBlockState>; but most of the time "one block → one block state + multiple
+	///variants" is enough.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Block Definition")
-	TMap<int32, FBlockState> StateVariants;
+	FBlockState BlockState;
 
 	// Indicates which StateID this block uses by default when placed/loaded
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Block Definition")
