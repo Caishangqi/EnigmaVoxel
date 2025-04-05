@@ -2,7 +2,22 @@
 #include "CoreMinimal.h"
 #include "BlockState.generated.h"
 
-enum class EBlockDirection : uint8;
+USTRUCT(BlueprintType)
+struct FBlockVariantDefinition
+{
+	GENERATED_BODY()
+
+public:
+	// This is where the reference to the Mesh is stored. It can be a direct UStaticMesh* or a TSoftObjectPtr<UStaticMesh>
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block State")
+	TSoftObjectPtr<UStaticMesh> Model = nullptr;
+
+	// If you have other information, such as material, collision, UV information, you can put it here:
+	// UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block State")
+	// UMaterialInterface* OverrideMaterial = nullptr;
+
+	// ...etc
+};
 
 USTRUCT(BlueprintType)
 struct FBlockState
@@ -10,11 +25,16 @@ struct FBlockState
 	GENERATED_BODY()
 
 public:
-	// A reference to UStaticMesh for irregular meshes
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TObjectPtr<UStaticMesh> CustomMesh;
+	// In Minecraft JSON: "variants": { "facing=north": {...}, "facing=south": {...} }
+	// Use FString as key here, can also use FName
+	// The value is the FBlockVariantDefinition you defined above, including Mesh/material, etc.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block State")
+	TMap<FString, FBlockVariantDefinition> Variants;
 
-	// Or store texture/material information, such as the material of the six faces, UV offset, etc.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TMap<EBlockDirection, UTexture2D*> FaceMaterials;
+	// If you want to simulate the default value (key = "") in Minecraft, you can directly add a Key="", in the editor
+	// and give the corresponding Model.
+
+	// If there are more common properties, you can also add them here:
+	// UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block State")
+	// bool bIsOpaque = true;
 };
