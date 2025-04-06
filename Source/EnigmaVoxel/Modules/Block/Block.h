@@ -4,6 +4,7 @@
 #include "BlockDefinition.h"
 #include "Block.generated.h"
 
+enum class EBlockDirection : uint8;
 // 一个简单的结构体，用于表示区块中单个方块实例
 USTRUCT(BlueprintType)
 struct FBlock
@@ -34,17 +35,9 @@ public:
 	UPROPERTY()
 	int32 StateID = 0;
 
-	FBlock()
-		: Definition(nullptr)
-		  , Coordinates(FIntVector::ZeroValue)
-		  , Health(100) // 默认生命值
-	{
-	}
+	UMaterialInterface* GetFacesMaterial(EBlockDirection Direction) const;
 
-	FBlock(const FIntVector& InCoords, UBlockDefinition* InDefinition, int32 InHealth = 100)
-		: Definition(InDefinition)
-		  , Coordinates(InCoords)
-		  , Health(InHealth)
-	{
-	}
+	FBlock();
+
+	FBlock(const FIntVector& InCoords, UBlockDefinition* InDefinition, int32 InHealth = 100);
 };
