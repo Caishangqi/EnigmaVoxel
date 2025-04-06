@@ -10,7 +10,7 @@ struct FBlockVariantDefinition
 public:
 	// This is where the reference to the Mesh is stored. It can be a direct UStaticMesh* or a TSoftObjectPtr<UStaticMesh>
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block State")
-	TObjectPtr<UStaticMesh> Model;
+	TSoftObjectPtr<UStaticMesh> Model;
 
 	// If you have other information, such as material, collision, UV information, you can put it here:
 	// UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block State")
