@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
-#include "EnigmaVoxel/Modules/Chunk/Chunk.h"
+#include "EnigmaVoxel/Modules/Chunk/ChunkActor.h"
 #include "EnigmaVoxel/Modules/Chunk/ChunkData.h"
 #include "UObject/Object.h"
 #include "EnigmaWorld.generated.h"
@@ -24,7 +24,7 @@ public:
 	virtual UWorld* GetWorld() const override;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Chunk")
-	TMap<FIntVector, TObjectPtr<AChunk>> LoadedChunks;
+	TMap<FIntVector, TObjectPtr<AChunkActor>> LoadedChunks;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Chunk")
 	TArray<TObjectPtr<APawn>> Players;
 	// Store [Chunk coordinates => Chunk information]
@@ -63,7 +63,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category="World")
 	void UpdateStreamingChunks();
 	DEPRECATED_MACRO(1.2, "The Method is deprecated, please use BeginLoadChunkAsync() instead")
-	AChunk* LoadChunk(const FIntVector& ChunkCoords);
+	AChunkActor* LoadChunk(const FIntVector& ChunkCoords);
 	bool    UnloadChunk(const FIntVector& ChunkCoords);
 
 	// Async
