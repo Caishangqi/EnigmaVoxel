@@ -3,6 +3,7 @@
 #include "EnigmaVoxel/Core/Log/DefinedLog.h"
 #include "EnigmaVoxel/Core/Register/EnigmaRegistrationSubsystem.h"
 #include "EnigmaVoxel/Core/World/EnigmaWorld.h"
+#include "EnigmaVoxel/Modules/Block/Enum/BlockDirection.h"
 
 FChunkData::FChunkData(): ChunkCoords(FIntVector::ZeroValue)
                           , ChunkDimension(FIntVector(16, 16, 16))
@@ -12,6 +13,8 @@ FChunkData::FChunkData(): ChunkCoords(FIntVector::ZeroValue)
 {
 	int32 Size = ChunkDimension.X * ChunkDimension.Y * ChunkDimension.Z;
 	Blocks.SetNum(Size);
+	CollectedMaterials.SetNum(Size);
+	MaterialToSectionMap.Reserve(Size);
 }
 
 int32 FChunkData::GetBlockIndex(const FIntVector& LocalCoords) const
@@ -57,6 +60,44 @@ bool FChunkData::FillChunkWithArea(FIntVector fillArea, FString Namespace, FStri
 	}
 	return true;
 }
+
+bool FChunkData::RefreshMaterialData()
+{
+	CollectedMaterials.Empty();
+	MaterialToSectionMap.Empty();
+	NextSectionIndex = 0;
+	int32 Size       = ChunkDimension.X * ChunkDimension.Y * ChunkDimension.Z;
+	Blocks.SetNum(Size);
+	CollectedMaterials.SetNum(Size);
+	MaterialToSectionMap.Reserve(Size);
+	return true;
+}
+
+
+int32 FChunkData::GetSectionIndexForMaterial(UMaterialInterface* InMaterial)
+{
+	if (!InMaterial)
+	{
+		UE_LOG(LogEnigmaVoxelChunk, Warning, TEXT("GetSectionIndexForMaterial called with nullptr!"));
+		return -1;
+	}
+	if (int32* FoundIndex = MaterialToSectionMap.Find(InMaterial))
+	{
+		return *FoundIndex;
+	}
+	// 否则 => 创建新的 SectionIndex
+	int32 NewSectionIndex = NextSectionIndex++;
+	MaterialToSectionMap.Add(InMaterial, NewSectionIndex);
+
+	// 确保 CollectedMaterials 容器能放这个下标
+	/*if (CollectedMaterials.Num() <= NewSectionIndex)
+	{
+		CollectedMaterials.SetNum(NewSectionIndex + 1, EAllowShrinking::Yes);
+	}*/
+	CollectedMaterials[NewSectionIndex] = InMaterial;
+	return NewSectionIndex;
+}
+
 
 /// return whether or not the block in the Chunk's facing is visible in chunk local space
 /// @param ChunkData the ChunkData
@@ -263,7 +304,7 @@ bool IsFaceVisible(UEnigmaWorld* World, const FChunkData& ChunkData, int x, int 
 /// @param Mesh 
 /// @param Block The Block slot of The chunk
 /// @param ChunkData 
-void AppendBoxForBlock(UE::Geometry::FDynamicMesh3& Mesh, const FBlock& Block, const FChunkData& ChunkData)
+void AppendBoxForBlock(UE::Geometry::FDynamicMesh3& Mesh, const FBlock& Block, FChunkData& ChunkData)
 {
 	const FIntVector blockPos = Block.Coordinates;
 	// Calculate the coordinates of each block in the world
@@ -284,43 +325,49 @@ void AppendBoxForBlock(UE::Geometry::FDynamicMesh3& Mesh, const FBlock& Block, c
 	// +X faces => EBlockDirection::NORTH
 	if (IsFaceVisibleInChunkData(ChunkData, blockPos.X, blockPos.Y, blockPos.Z, EBlockDirection::NORTH))
 	{
-		Mesh.AppendTriangle(v1, v0, v3);
-		Mesh.AppendTriangle(v1, v3, v2);
+		int sectionID = ChunkData.GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::NORTH));
+		Mesh.AppendTriangle(v1, v0, v3, sectionID);
+		Mesh.AppendTriangle(v1, v3, v2, sectionID);
 	}
 
 	// -X faces => EBlockDirection::SOUTH
 	if (IsFaceVisibleInChunkData(ChunkData, blockPos.X, blockPos.Y, blockPos.Z, EBlockDirection::SOUTH))
 	{
-		Mesh.AppendTriangle(v5, v4, v7);
-		Mesh.AppendTriangle(v5, v7, v6);
+		int sectionID = ChunkData.GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::SOUTH));
+		Mesh.AppendTriangle(v5, v4, v7, sectionID);
+		Mesh.AppendTriangle(v5, v7, v6, sectionID);
 	}
 
 	// +Y faces => EBlockDirection::EAST
 	if (IsFaceVisibleInChunkData(ChunkData, blockPos.X, blockPos.Y, blockPos.Z, EBlockDirection::EAST))
 	{
-		Mesh.AppendTriangle(v4, v1, v2);
-		Mesh.AppendTriangle(v4, v2, v7);
+		int sectionID = ChunkData.GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::EAST));
+		Mesh.AppendTriangle(v4, v1, v2, sectionID);
+		Mesh.AppendTriangle(v4, v2, v7, sectionID);
 	}
 
 	// -Y faces => EBlockDirection::WEST
 	if (IsFaceVisibleInChunkData(ChunkData, blockPos.X, blockPos.Y, blockPos.Z, EBlockDirection::WEST))
 	{
-		Mesh.AppendTriangle(v0, v5, v6);
-		Mesh.AppendTriangle(v0, v6, v3);
+		int sectionID = ChunkData.GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::WEST));
+		Mesh.AppendTriangle(v0, v5, v6, sectionID);
+		Mesh.AppendTriangle(v0, v6, v3, sectionID);
 	}
 
 	// -Z faces => EBlockDirection::DOWN
 	if (IsFaceVisibleInChunkData(ChunkData, blockPos.X, blockPos.Y, blockPos.Z, EBlockDirection::DOWN))
 	{
-		Mesh.AppendTriangle(v5, v0, v1);
-		Mesh.AppendTriangle(v5, v1, v4);
+		int sectionID = ChunkData.GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::DOWN));
+		Mesh.AppendTriangle(v5, v0, v1, sectionID);
+		Mesh.AppendTriangle(v5, v1, v4, sectionID);
 	}
 
 	// +Z faces => EBlockDirection::UP
 	if (IsFaceVisibleInChunkData(ChunkData, blockPos.X, blockPos.Y, blockPos.Z, EBlockDirection::UP))
 	{
-		Mesh.AppendTriangle(v2, v3, v6);
-		Mesh.AppendTriangle(v2, v6, v7);
+		int sectionID = ChunkData.GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::UP));
+		Mesh.AppendTriangle(v2, v3, v6, sectionID);
+		Mesh.AppendTriangle(v2, v6, v7, sectionID);
 	}
 }
 
@@ -333,7 +380,7 @@ void AppendBoxForBlock(UE::Geometry::FDynamicMesh3& Mesh, const FBlock& Block, c
 /// @param Mesh 
 /// @param Block 
 /// @param ChunkData 
-void AppendBoxForBlock(UEnigmaWorld* World, UE::Geometry::FDynamicMesh3& Mesh, const FBlock& Block, const FChunkData& ChunkData)
+void AppendBoxForBlock(UEnigmaWorld* World, UE::Geometry::FDynamicMesh3& Mesh, const FBlock& Block, FChunkData& ChunkData)
 {
 	const FIntVector blockPos = Block.Coordinates;
 	// Calculate the diagonal point of the block in the world
@@ -353,42 +400,48 @@ void AppendBoxForBlock(UEnigmaWorld* World, UE::Geometry::FDynamicMesh3& Mesh, c
 	// +X => EBlockDirection::NORTH
 	if (IsFaceVisible(World, ChunkData, blockPos.X, blockPos.Y, blockPos.Z, EBlockDirection::NORTH))
 	{
-		Mesh.AppendTriangle(v1, v0, v3);
-		Mesh.AppendTriangle(v1, v3, v2);
+		int sectionID = ChunkData.GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::NORTH));
+		Mesh.AppendTriangle(v1, v0, v3, sectionID);
+		Mesh.AppendTriangle(v1, v3, v2, sectionID);
 	}
 
 	// -X => EBlockDirection::SOUTH
 	if (IsFaceVisible(World, ChunkData, blockPos.X, blockPos.Y, blockPos.Z, EBlockDirection::SOUTH))
 	{
-		Mesh.AppendTriangle(v5, v4, v7);
-		Mesh.AppendTriangle(v5, v7, v6);
+		int sectionID = ChunkData.GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::SOUTH));
+		Mesh.AppendTriangle(v5, v4, v7, sectionID);
+		Mesh.AppendTriangle(v5, v7, v6, sectionID);
 	}
 
 	// +Y => EBlockDirection::EAST
 	if (IsFaceVisible(World, ChunkData, blockPos.X, blockPos.Y, blockPos.Z, EBlockDirection::EAST))
 	{
-		Mesh.AppendTriangle(v4, v1, v2);
-		Mesh.AppendTriangle(v4, v2, v7);
+		int sectionID = ChunkData.GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::EAST));
+		Mesh.AppendTriangle(v4, v1, v2, sectionID);
+		Mesh.AppendTriangle(v4, v2, v7, sectionID);
 	}
 
 	// -Y => EBlockDirection::WEST
 	if (IsFaceVisible(World, ChunkData, blockPos.X, blockPos.Y, blockPos.Z, EBlockDirection::WEST))
 	{
-		Mesh.AppendTriangle(v0, v5, v6);
-		Mesh.AppendTriangle(v0, v6, v3);
+		int sectionID = ChunkData.GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::WEST));
+		Mesh.AppendTriangle(v0, v5, v6, sectionID);
+		Mesh.AppendTriangle(v0, v6, v3, sectionID);
 	}
 
 	// -Z => EBlockDirection::DOWN
 	if (IsFaceVisible(World, ChunkData, blockPos.X, blockPos.Y, blockPos.Z, EBlockDirection::DOWN))
 	{
-		Mesh.AppendTriangle(v5, v0, v1);
-		Mesh.AppendTriangle(v5, v1, v4);
+		int sectionID = ChunkData.GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::DOWN));
+		Mesh.AppendTriangle(v5, v0, v1, sectionID);
+		Mesh.AppendTriangle(v5, v1, v4, sectionID);
 	}
 
 	// +Z => EBlockDirection::UP
 	if (IsFaceVisible(World, ChunkData, blockPos.X, blockPos.Y, blockPos.Z, EBlockDirection::UP))
 	{
-		Mesh.AppendTriangle(v2, v3, v6);
-		Mesh.AppendTriangle(v2, v6, v7);
+		int sectionID = ChunkData.GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::UP));
+		Mesh.AppendTriangle(v2, v3, v6, sectionID);
+		Mesh.AppendTriangle(v2, v6, v7, sectionID);
 	}
 }

@@ -53,6 +53,18 @@ public:
 	// Constructed visible mesh data (can be passed directly to the game thread after the background thread has completed the generation)
 	FChunkMeshData BuiltMeshData;
 
+	// 用来记录：某个材质对应的 SectionIndex（在网格里即 GroupID）。
+	// 当网格渲染时，如果多个三角形共用同一个 SectionIndex，就视为使用同一材质。
+	UPROPERTY()
+	TMap<UMaterialInterface*, int32> MaterialToSectionMap;
+
+	// 存放实际要给组件设置的材质列表（对应 SectionIndex）
+	UPROPERTY()
+	TArray<UMaterialInterface*> CollectedMaterials;
+
+	// 动态分配下一个可用的 Section 索引
+	int32 NextSectionIndex = 0;
+
 public:
 	FChunkData();
 
@@ -62,6 +74,8 @@ public:
 	void          SetBlock(const FIntVector& LocalCoords, const FBlock& InBlockData);
 	void          SetBlock(const FIntVector& InCoords, FString Namespace = "Enigma", FString Path = "");
 	bool          FillChunkWithArea(FIntVector fillArea, FString Namespace = "Enigma", FString Path = "");
+	bool          RefreshMaterialData();
+	int32         GetSectionIndexForMaterial(UMaterialInterface* InMaterial);
 };
 
 
@@ -79,5 +93,5 @@ struct FChunkInfo
 
 bool IsFaceVisibleInChunkData(const FChunkData& ChunkData, int x, int y, int z, EBlockDirection Direction);
 bool IsFaceVisible(UEnigmaWorld* World, const FChunkData& ChunkData, int x, int y, int z, EBlockDirection Direction);
-void AppendBoxForBlock(UE::Geometry::FDynamicMesh3& Mesh, const FBlock& Block, const FChunkData& ChunkData);
-void AppendBoxForBlock(UEnigmaWorld* World, UE::Geometry::FDynamicMesh3& Mesh, const FBlock& Block, const FChunkData& ChunkData);
+void AppendBoxForBlock(UE::Geometry::FDynamicMesh3& Mesh, const FBlock& Block, FChunkData& ChunkData);
+void AppendBoxForBlock(UEnigmaWorld* World, UE::Geometry::FDynamicMesh3& Mesh, const FBlock& Block, FChunkData& ChunkData);
