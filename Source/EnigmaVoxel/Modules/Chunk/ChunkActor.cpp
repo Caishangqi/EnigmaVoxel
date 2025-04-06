@@ -27,8 +27,6 @@ AChunkActor::AChunkActor()
 		// 如果只想用简单碰撞或无碰撞，也可配置 bUseComplexAsSimpleCollision = false;
 		DynamicMeshComponent->SetComplexAsSimpleCollisionEnabled(false);
 	}
-	CollectedMaterials.Reserve(GetChunkBlockSize());
-	MaterialToSectionMap.Reserve(GetChunkBlockSize());
 }
 
 // Called when the game starts or when spawned
@@ -148,10 +146,14 @@ bool AChunkActor::UpdateChunkMaterial(FChunkData& InChunkData)
 {
 	for (int32 SlotIndex = 0; SlotIndex < InChunkData.CollectedMaterials.Num(); SlotIndex++)
 	{
-		if (InChunkData.CollectedMaterials[SlotIndex])
+		for (TTuple<UMaterialInterface*, int> MaterialToSectionMap : InChunkData.MaterialToSectionMap)
+		{
+			DynamicMeshComponent->SetMaterial(MaterialToSectionMap.Value, MaterialToSectionMap.Key);
+		}
+		/*if (InChunkData.CollectedMaterials[SlotIndex])
 		{
 			DynamicMeshComponent->SetMaterial(SlotIndex, InChunkData.CollectedMaterials[SlotIndex]);
-		}
+		}*/
 	}
 	return true;
 }
@@ -196,45 +198,45 @@ void AChunkActor::AppendBoxWithCollision(FBlock& Block)
 	// +x faces
 	if (IsVisibleFace(Block, EBlockDirection::NORTH))
 	{
-		int sectionID = GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::NORTH));
-		mesh.AppendTriangle(v1, v0, v3, sectionID);
-		mesh.AppendTriangle(v1, v3, v2, sectionID);
+		//int sectionID = GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::NORTH));
+		mesh.AppendTriangle(v1, v0, v3);
+		mesh.AppendTriangle(v1, v3, v2);
 	}
 
 	// -x faces
 	if (IsVisibleFace(Block, EBlockDirection::SOUTH))
 	{
-		int sectionID = GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::SOUTH));
-		mesh.AppendTriangle(v5, v4, v7, sectionID);
-		mesh.AppendTriangle(v5, v7, v6, sectionID);
+		//int sectionID = GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::SOUTH));
+		mesh.AppendTriangle(v5, v4, v7);
+		mesh.AppendTriangle(v5, v7, v6);
 	}
 	// -y faces
 	if (IsVisibleFace(Block, EBlockDirection::EAST))
 	{
-		int sectionID = GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::EAST));
-		mesh.AppendTriangle(v4, v1, v2, sectionID);
-		mesh.AppendTriangle(v4, v2, v7, sectionID);
+		//int sectionID = GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::EAST));
+		mesh.AppendTriangle(v4, v1, v2);
+		mesh.AppendTriangle(v4, v2, v7);
 	}
 	// +y faces
 	if (IsVisibleFace(Block, EBlockDirection::WEST))
 	{
-		int sectionID = GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::WEST));
-		mesh.AppendTriangle(v0, v5, v6, sectionID);
-		mesh.AppendTriangle(v0, v6, v3, sectionID);
+		//int sectionID = GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::WEST));
+		mesh.AppendTriangle(v0, v5, v6);
+		mesh.AppendTriangle(v0, v6, v3);
 	}
 	// -z faces
 	if (IsVisibleFace(Block, EBlockDirection::DOWN))
 	{
-		int sectionID = GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::DOWN));
-		mesh.AppendTriangle(v5, v0, v1, sectionID);
-		mesh.AppendTriangle(v5, v1, v4, sectionID);
+		//int sectionID = GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::DOWN));
+		mesh.AppendTriangle(v5, v0, v1);
+		mesh.AppendTriangle(v5, v1, v4);
 	}
 	// +z faces
 	if (IsVisibleFace(Block, EBlockDirection::UP))
 	{
-		int sectionID = GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::UP));
-		mesh.AppendTriangle(v2, v3, v6, sectionID);
-		mesh.AppendTriangle(v2, v6, v7, sectionID);
+		//int sectionID = GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::UP));
+		mesh.AppendTriangle(v2, v3, v6);
+		mesh.AppendTriangle(v2, v6, v7);
 	}
 	DynamicMeshComponent->SetDynamicMesh(DynamicMesh);
 	//DynamicMeshComponent->NotifyMeshUpdated();
@@ -243,30 +245,6 @@ void AChunkActor::AppendBoxWithCollision(FBlock& Block)
 	DynamicMeshComponent->SetSimpleCollisionShapes(DynamicMeshComponent->GetSimpleCollisionShapes(),true);*/
 	//DynamicMeshComponent->UpdateCollision();
 	UE_LOG(LogEnigmaVoxelBlock, Display, TEXT("Append new Block triangles -> %s"), *Block.Coordinates.ToString());
-}
-
-int32 AChunkActor::GetSectionIndexForMaterial(UMaterialInterface* InMaterial)
-{
-	if (!InMaterial)
-	{
-		UE_LOG(LogEnigmaVoxelChunk, Warning, TEXT("GetSectionIndexForMaterial called with nullptr!"));
-		return -1;
-	}
-	if (int32* FoundIndex = MaterialToSectionMap.Find(InMaterial))
-	{
-		return *FoundIndex;
-	}
-	// 否则 => 创建新的 SectionIndex
-	int32 NewSectionIndex = NextSectionIndex++;
-	MaterialToSectionMap.Add(InMaterial, NewSectionIndex);
-
-	// 确保 CollectedMaterials 容器能放这个下标
-	if (CollectedMaterials.Num() <= NewSectionIndex)
-	{
-		CollectedMaterials.SetNum(NewSectionIndex + 1, EAllowShrinking::Yes);
-	}
-	CollectedMaterials[NewSectionIndex] = InMaterial;
-	return NewSectionIndex;
 }
 
 

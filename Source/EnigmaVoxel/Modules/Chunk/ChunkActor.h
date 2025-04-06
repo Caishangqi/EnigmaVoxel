@@ -33,18 +33,6 @@ protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	TArray<FBlock> Blocks;
 
-	// 用来记录：某个材质对应的 SectionIndex（在网格里即 GroupID）。
-	// 当网格渲染时，如果多个三角形共用同一个 SectionIndex，就视为使用同一材质。
-	UPROPERTY()
-	TMap<UMaterialInterface*, int32> MaterialToSectionMap;
-
-	// 存放实际要给组件设置的材质列表（对应 SectionIndex）
-	UPROPERTY()
-	TArray<UMaterialInterface*> CollectedMaterials;
-
-	// 动态分配下一个可用的 Section 索引
-	int32 NextSectionIndex = 0;
-
 protected:
 	UFUNCTION(BlueprintCallable)
 	int32 GetChunkBlockSize();
@@ -95,8 +83,6 @@ private:
 	/// The condition of collision will dependent on block definition properties
 	/// @param Block The Block slot of The chunk
 	void AppendBoxWithCollision(FBlock& Block);
-
-	int32 GetSectionIndexForMaterial(UMaterialInterface* InMaterial);
 
 public:
 	// Called every frame
