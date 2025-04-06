@@ -1,13 +1,14 @@
 ﻿#pragma once
 #include "CoreMinimal.h"
 #include "UObject/ObjectMacros.h"
+
 UENUM(BlueprintType)
 enum class EBlockDirection: uint8
 {
-	NORTH,
-	SOUTH,
-	EAST,
-	WEST,
-	UP,
-	DOWN
+	EAST = 0,
+	WEST = 1,
+	UP = 2,
+	DOWN = 3,
+	SOUTH = 4,
+	NORTH = 5
 };
