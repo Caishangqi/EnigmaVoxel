@@ -1,14 +1,16 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Chunk.h"
+#include "ChunkActor.h"
 
+#include "ChunkData.h"
 #include "EnigmaVoxel/Core/Log/DefinedLog.h"
 #include "EnigmaVoxel/Core/Register/EnigmaRegistrationSubsystem.h"
+#include "EnigmaVoxel/Modules/Block/Enum/BlockDirection.h"
 
 
 // Sets default values
-AChunk::AChunk()
+AChunkActor::AChunkActor()
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -25,34 +27,36 @@ AChunk::AChunk()
 		// 如果只想用简单碰撞或无碰撞，也可配置 bUseComplexAsSimpleCollision = false;
 		DynamicMeshComponent->SetComplexAsSimpleCollisionEnabled(false);
 	}
+	CollectedMaterials.Reserve(GetChunkBlockSize());
+	MaterialToSectionMap.Reserve(GetChunkBlockSize());
 }
 
 // Called when the game starts or when spawned
-void AChunk::BeginPlay()
+void AChunkActor::BeginPlay()
 {
 	Super::BeginPlay();
 }
 
-int32 AChunk::GetChunkBlockSize()
+int32 AChunkActor::GetChunkBlockSize()
 {
 	return ChunkDimension.X * ChunkDimension.Y * ChunkDimension.Z;
 }
 
-FBlock& AChunk::GetBlockAt(FIntVector InCoords)
+FBlock& AChunkActor::GetBlockAt(FIntVector InCoords)
 {
 	int32 Index = GetBlockIndexAt(InCoords);
 	//check(Blocks.IsValidIndex(Index));
 	return Blocks[Index];
 }
 
-int32 AChunk::GetBlockIndexAt(FIntVector InCoords)
+int32 AChunkActor::GetBlockIndexAt(FIntVector InCoords)
 {
 	return InCoords.X
 		+ InCoords.Y * ChunkDimension.X
 		+ InCoords.Z * ChunkDimension.X * ChunkDimension.Y;
 }
 
-bool AChunk::IsVisibleFace(FBlock& currentBlock, EBlockDirection InDirection)
+bool AChunkActor::IsVisibleFace(FBlock& currentBlock, EBlockDirection InDirection)
 {
 	FIntVector3 blockPos = currentBlock.Coordinates;
 	switch (InDirection)
@@ -103,7 +107,7 @@ bool AChunk::IsVisibleFace(FBlock& currentBlock, EBlockDirection InDirection)
 	return false;
 }
 
-bool AChunk::UpdateBlock(FBlock InBlockData)
+bool AChunkActor::UpdateBlock(FBlock InBlockData)
 {
 	Blocks[GetBlockIndexAt(InBlockData.Coordinates)] = InBlockData;
 	//UE_LOG(LogEnigmaVoxelChunk, Log, TEXT("UpdateBlock in Chunk -> %s at -> %s"), *GetName(), *InBlockData.Coordinates.ToString())
@@ -114,14 +118,14 @@ bool AChunk::UpdateBlock(FBlock InBlockData)
 	return true;
 }
 
-bool AChunk::UpdateBlockResourceLocation(FIntVector InCoords, FString Namespace, FString Path)
+bool AChunkActor::UpdateBlockResourceLocation(FIntVector InCoords, FString Namespace, FString Path)
 {
 	UBlockDefinition* def   = UEnigmaRegistrationSubsystem::BLOCK_GET_VALUE(Namespace, Path);
 	FBlock            Block = FBlock(InCoords, def, 100);
 	return UpdateBlock(Block);
 }
 
-bool AChunk::UpdateChunk()
+bool AChunkActor::UpdateChunk()
 {
 	if (!DynamicMeshComponent)
 	{
@@ -140,7 +144,20 @@ bool AChunk::UpdateChunk()
 	return false;
 }
 
-bool AChunk::FillChunkWithXYZ(FIntVector fillArea, FString Namespace, FString Path)
+bool AChunkActor::UpdateChunkMaterial(FChunkData& InChunkData)
+{
+	for (int32 SlotIndex = 0; SlotIndex < InChunkData.CollectedMaterials.Num(); SlotIndex++)
+	{
+		if (InChunkData.CollectedMaterials[SlotIndex])
+		{
+			DynamicMeshComponent->SetMaterial(SlotIndex, InChunkData.CollectedMaterials[SlotIndex]);
+		}
+	}
+	return true;
+}
+
+
+bool AChunkActor::FillChunkWithXYZ(FIntVector fillArea, FString Namespace, FString Path)
 {
 	for (int z = 0; z < fillArea.Z; z++)
 	{
@@ -155,7 +172,7 @@ bool AChunk::FillChunkWithXYZ(FIntVector fillArea, FString Namespace, FString Pa
 	return false;
 }
 
-void AChunk::AppendBoxWithCollision(FBlock& Block)
+void AChunkActor::AppendBoxWithCollision(FBlock& Block)
 {
 	FIntVector blockPos          = Block.Coordinates;
 	FVector    blockVertMinPoint = FVector(blockPos.X * 100, blockPos.Y * 100, blockPos.Z * 100);
@@ -179,39 +196,45 @@ void AChunk::AppendBoxWithCollision(FBlock& Block)
 	// +x faces
 	if (IsVisibleFace(Block, EBlockDirection::NORTH))
 	{
-		mesh.AppendTriangle(v1, v0, v3);
-		mesh.AppendTriangle(v1, v3, v2);
+		int sectionID = GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::NORTH));
+		mesh.AppendTriangle(v1, v0, v3, sectionID);
+		mesh.AppendTriangle(v1, v3, v2, sectionID);
 	}
 
 	// -x faces
 	if (IsVisibleFace(Block, EBlockDirection::SOUTH))
 	{
-		mesh.AppendTriangle(v5, v4, v7);
-		mesh.AppendTriangle(v5, v7, v6);
+		int sectionID = GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::SOUTH));
+		mesh.AppendTriangle(v5, v4, v7, sectionID);
+		mesh.AppendTriangle(v5, v7, v6, sectionID);
 	}
 	// -y faces
 	if (IsVisibleFace(Block, EBlockDirection::EAST))
 	{
-		mesh.AppendTriangle(v4, v1, v2);
-		mesh.AppendTriangle(v4, v2, v7);
+		int sectionID = GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::EAST));
+		mesh.AppendTriangle(v4, v1, v2, sectionID);
+		mesh.AppendTriangle(v4, v2, v7, sectionID);
 	}
 	// +y faces
 	if (IsVisibleFace(Block, EBlockDirection::WEST))
 	{
-		mesh.AppendTriangle(v0, v5, v6);
-		mesh.AppendTriangle(v0, v6, v3);
+		int sectionID = GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::WEST));
+		mesh.AppendTriangle(v0, v5, v6, sectionID);
+		mesh.AppendTriangle(v0, v6, v3, sectionID);
 	}
 	// -z faces
 	if (IsVisibleFace(Block, EBlockDirection::DOWN))
 	{
-		mesh.AppendTriangle(v5, v0, v1);
-		mesh.AppendTriangle(v5, v1, v4);
+		int sectionID = GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::DOWN));
+		mesh.AppendTriangle(v5, v0, v1, sectionID);
+		mesh.AppendTriangle(v5, v1, v4, sectionID);
 	}
 	// +z faces
 	if (IsVisibleFace(Block, EBlockDirection::UP))
 	{
-		mesh.AppendTriangle(v2, v3, v6);
-		mesh.AppendTriangle(v2, v6, v7);
+		int sectionID = GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::UP));
+		mesh.AppendTriangle(v2, v3, v6, sectionID);
+		mesh.AppendTriangle(v2, v6, v7, sectionID);
 	}
 	DynamicMeshComponent->SetDynamicMesh(DynamicMesh);
 	//DynamicMeshComponent->NotifyMeshUpdated();
@@ -219,12 +242,36 @@ void AChunk::AppendBoxWithCollision(FBlock& Block)
 	DynamicMeshComponent->ClearSimpleCollisionShapes(false);
 	DynamicMeshComponent->SetSimpleCollisionShapes(DynamicMeshComponent->GetSimpleCollisionShapes(),true);*/
 	//DynamicMeshComponent->UpdateCollision();
-	UE_LOG(LogEnigmaVoxelChunk, Display, TEXT("Append new Block triangles -> %s"), *Block.Coordinates.ToString());
+	UE_LOG(LogEnigmaVoxelBlock, Display, TEXT("Append new Block triangles -> %s"), *Block.Coordinates.ToString());
+}
+
+int32 AChunkActor::GetSectionIndexForMaterial(UMaterialInterface* InMaterial)
+{
+	if (!InMaterial)
+	{
+		UE_LOG(LogEnigmaVoxelChunk, Warning, TEXT("GetSectionIndexForMaterial called with nullptr!"));
+		return -1;
+	}
+	if (int32* FoundIndex = MaterialToSectionMap.Find(InMaterial))
+	{
+		return *FoundIndex;
+	}
+	// 否则 => 创建新的 SectionIndex
+	int32 NewSectionIndex = NextSectionIndex++;
+	MaterialToSectionMap.Add(InMaterial, NewSectionIndex);
+
+	// 确保 CollectedMaterials 容器能放这个下标
+	if (CollectedMaterials.Num() <= NewSectionIndex)
+	{
+		CollectedMaterials.SetNum(NewSectionIndex + 1, EAllowShrinking::Yes);
+	}
+	CollectedMaterials[NewSectionIndex] = InMaterial;
+	return NewSectionIndex;
 }
 
 
 // Called every frame
-void AChunk::Tick(float DeltaTime)
+void AChunkActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 }

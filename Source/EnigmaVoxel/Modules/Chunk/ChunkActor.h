@@ -5,17 +5,19 @@
 #include "CoreMinimal.h"
 #include "EnigmaVoxel/Modules/Block/Block.h"
 #include "Runtime/GeometryFramework/Public/DynamicMeshActor.h"
-#include "Chunk.generated.h"
+#include "ChunkActor.generated.h"
 
+
+struct FChunkData;
 
 UCLASS()
-class ENIGMAVOXEL_API AChunk : public ADynamicMeshActor
+class ENIGMAVOXEL_API AChunkActor : public ADynamicMeshActor
 {
 	GENERATED_BODY()
 
 public:
 	// Sets default values for this actor's properties
-	AChunk();
+	AChunkActor();
 
 protected:
 	// Called when the game starts or when spawned
@@ -30,6 +32,18 @@ protected:
 	FIntVector ChunkDimension = FIntVector(16, 16, 16);
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	TArray<FBlock> Blocks;
+
+	// 用来记录：某个材质对应的 SectionIndex（在网格里即 GroupID）。
+	// 当网格渲染时，如果多个三角形共用同一个 SectionIndex，就视为使用同一材质。
+	UPROPERTY()
+	TMap<UMaterialInterface*, int32> MaterialToSectionMap;
+
+	// 存放实际要给组件设置的材质列表（对应 SectionIndex）
+	UPROPERTY()
+	TArray<UMaterialInterface*> CollectedMaterials;
+
+	// 动态分配下一个可用的 Section 索引
+	int32 NextSectionIndex = 0;
 
 protected:
 	UFUNCTION(BlueprintCallable)
@@ -67,6 +81,7 @@ public:
 	/// @return whether or not rebuild successful
 	UFUNCTION(BlueprintCallable)
 	bool UpdateChunk();
+	bool UpdateChunkMaterial(FChunkData & InChunkData);
 
 	/// Utility Function Right now for quickly fill the chunk with blocks
 	/// TODO: the functions inside chunk will move to world subsystem perhaps
@@ -81,7 +96,10 @@ private:
 	/// @param Block The Block slot of The chunk
 	void AppendBoxWithCollision(FBlock& Block);
 
+	int32 GetSectionIndexForMaterial(UMaterialInterface* InMaterial);
+
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 };
+
