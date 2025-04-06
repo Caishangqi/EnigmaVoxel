@@ -6,3 +6,4 @@
 DECLARE_LOG_CATEGORY_EXTERN(LogEnigmaVoxelRegister, Log, All);
 DECLARE_LOG_CATEGORY_EXTERN(LogEnigmaVoxelChunk, Log, All);
 DECLARE_LOG_CATEGORY_EXTERN(LogEnigmaVoxelWorld, Log, All);
+DECLARE_LOG_CATEGORY_EXTERN(LogEnigmaVoxelBlock, Log, All);
