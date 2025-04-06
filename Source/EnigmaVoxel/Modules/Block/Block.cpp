@@ -1,16 +1,35 @@
 ﻿#include "Block.h"
 
 #include "EnigmaVoxel/Core/Log/DefinedLog.h"
+#include "Enum/BlockDirection.h"
 
 UMaterialInterface* FBlock::GetFacesMaterial(EBlockDirection Direction) const
 {
-	if (Definition == nullptr)
+	if (!Definition)
 	{
-		UE_LOG(LogEnigmaVoxelBlock, Error, TEXT("Block Definition is null!"))
-		return nullptr; /// Consider return the missing texture
+		UE_LOG(LogEnigmaVoxelBlock, Error, TEXT("Block Definition is null!"));
+		return nullptr;
 	}
-	TObjectPtr<UStaticMesh> meshModel = Definition->BlockState.Variants.Find(BlockStateKey)->Model;
-	return meshModel->GetMaterial(static_cast<int32>(Direction));
+
+	FBlockVariantDefinition* Variant = Definition->BlockState.Variants.Find(BlockStateKey);
+	if (!Variant)
+	{
+		Variant = Definition->BlockState.Variants.Find(TEXT("")); // fallback 默认 key
+		if (!Variant)
+		{
+			UE_LOG(LogEnigmaVoxelBlock, Warning, TEXT("Cannot find variant for key '%s' in block '%s'"), *BlockStateKey, *Definition->GetName());
+			return nullptr;
+		}
+	}
+
+	UStaticMesh* Mesh = Variant->Model.LoadSynchronous(); // 强制加载
+	if (!Mesh)
+	{
+		UE_LOG(LogEnigmaVoxelBlock, Error, TEXT("Block mesh is null for block '%s'"), *Definition->GetName());
+		return nullptr;
+	}
+
+	return Mesh->GetMaterial(static_cast<uint8>(Direction));
 }
 
 FBlock::FBlock()
