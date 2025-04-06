@@ -195,7 +195,7 @@ bool UEnigmaWorld::UnloadChunk(const FIntVector& ChunkCoords)
 void UEnigmaWorld::RebuildChunkMeshData(FChunkInfo& InOutChunkInfo)
 {
 	FChunkData& ChunkData = InOutChunkInfo.ChunkData;
-	ChunkData.RefreshMaterialData();
+	//ChunkData.RefreshMaterialData();
 	FDynamicMesh3 TempMesh;
 
 	UE_LOG(LogEnigmaVoxelChunk, Warning, TEXT("Rebuild Chunk at ChunkPos= [ %s ]"), *ChunkData.ChunkCoords.ToString())
