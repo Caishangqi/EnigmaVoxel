@@ -98,41 +98,9 @@ void UEnigmaWorld::UpdateStreamingChunks()
 	TSet<FIntVector> ToUnload = ExistingChunks.Difference(DesiredChunkCoords);
 	/// We constantly check the dirty chunk, if we found the dirty chunk we
 	/// rebuild their data based on its current blockdata and neibourhood state
-	for (auto& KV : ChunkMap)
+	for (auto& chunk : ChunkMap)
 	{
-		FIntVector  ChunkCoords = KV.Key;
-		FChunkInfo& Info        = KV.Value;
-		if (Info.bIsDirty && Info.LoadState == EChunkLoadState::LOADED)
-		{
-			Info.bIsDirty = false;
-			Async(EAsyncExecution::ThreadPool,
-			      [this, ChunkCoords]()
-			      {
-				      FScopeLock Lock(&ChunkMapMutex);
-				      if (!ChunkMap.Contains(ChunkCoords))
-					      return;
-				      FChunkInfo& InfoRef = ChunkMap[ChunkCoords];
-				      RebuildChunkMeshData(InfoRef);
-			      },
-			      [this, ChunkCoords]() // Update the chunk mesh data in the main thread
-			      {
-				      AsyncTask(ENamedThreads::GameThread, [this, ChunkCoords]()
-				      {
-					      FScopeLock Lock(&ChunkMapMutex);
-					      if (!ChunkMap.Contains(ChunkCoords))
-						      return;
-					      FChunkInfo& InfoRef = ChunkMap[ChunkCoords];
-					      if (!LoadedChunks.Contains(ChunkCoords))
-						      return;
-					      AChunkActor*   chunk   = LoadedChunks[ChunkCoords];
-					      UDynamicMesh*  DynMesh = chunk->GetDynamicMeshComponent()->GetDynamicMesh();
-					      FDynamicMesh3& MeshRef = DynMesh->GetMeshRef();
-					      MeshRef                = InfoRef.ChunkData.BuiltMeshData.Mesh;
-					      chunk->UpdateChunkMaterial(InfoRef.ChunkData);
-					      chunk->GetDynamicMeshComponent()->NotifyMeshUpdated();
-				      });
-			      });
-		}
+		//UpdateChunkAsync(chunk.Key);
 	}
 
 	for (const FIntVector& ChunkCoords : ToLoad)
@@ -195,7 +163,7 @@ bool UEnigmaWorld::UnloadChunk(const FIntVector& ChunkCoords)
 void UEnigmaWorld::RebuildChunkMeshData(FChunkInfo& InOutChunkInfo)
 {
 	FChunkData& ChunkData = InOutChunkInfo.ChunkData;
-	//ChunkData.RefreshMaterialData();
+	ChunkData.RefreshMaterialData();
 	FDynamicMesh3 TempMesh;
 
 	UE_LOG(LogEnigmaVoxelChunk, Warning, TEXT("Rebuild Chunk at ChunkPos= [ %s ]"), *ChunkData.ChunkCoords.ToString())
@@ -228,6 +196,8 @@ void UEnigmaWorld::GenerateChunkDataAsync(FChunkData& InOutChunkData)
 
 	FDynamicMesh3 TempMesh;
 
+	/// TODO: Consider move the Material Section Cache here that maintain ChunkData as pure data
+	/// TODO: Fix the concurrent issue that make the Material section chaose.
 	for (int z = 0; z < InOutChunkData.ChunkDimension.Z; ++z)
 	{
 		for (int y = 0; y < InOutChunkData.ChunkDimension.Y; ++y)
@@ -240,7 +210,6 @@ void UEnigmaWorld::GenerateChunkDataAsync(FChunkData& InOutChunkData)
 					continue;
 				}
 				// Append the visible surface of the block to TempMesh
-				// TODO: Try to implement the chunk border block visible when other chunk
 				// UNLOADED, but culling after other LOADED
 				AppendBoxForBlock(TempMesh, Block, InOutChunkData);
 			}
@@ -253,28 +222,25 @@ void UEnigmaWorld::GenerateChunkDataAsync(FChunkData& InOutChunkData)
 
 void UEnigmaWorld::BeginLoadChunkAsync(const FIntVector& ChunkCoords)
 {
+	if (!ChunkMap.Contains(ChunkCoords))
 	{
-		FScopeLock Lock(&ChunkMapMutex);
-		if (!ChunkMap.Contains(ChunkCoords))
+		FChunkInfo NewInfo;
+		NewInfo.ChunkData.ChunkCoords    = ChunkCoords;
+		NewInfo.ChunkData.ChunkDimension = FIntVector(16, 16, 16);
+		NewInfo.ChunkData.BlockSize      = 100.f;
+		NewInfo.LoadState                = EChunkLoadState::LOADING;
+		ChunkMap.Add(ChunkCoords, NewInfo);
+		UE_LOG(LogEnigmaVoxelChunk, Display, TEXT("FChunkData Construct: ChunkPos= [ %s ], NumBlocks= [ %d ]"), *ChunkCoords.ToString(), NewInfo.ChunkData.Blocks.Num())
+	}
+	else
+	{
+		FChunkInfo& Info = ChunkMap[ChunkCoords];
+		if (Info.LoadState != EChunkLoadState::UNLOADED)
 		{
-			FChunkInfo NewInfo;
-			NewInfo.ChunkData.ChunkCoords    = ChunkCoords;
-			NewInfo.ChunkData.ChunkDimension = FIntVector(16, 16, 16);
-			NewInfo.ChunkData.BlockSize      = 100.f;
-			NewInfo.LoadState                = EChunkLoadState::LOADING;
-			ChunkMap.Add(ChunkCoords, NewInfo);
-			UE_LOG(LogEnigmaVoxelChunk, Display, TEXT("FChunkData Construct: ChunkPos= [ %s ], NumBlocks= [ %d ]"), *ChunkCoords.ToString(), NewInfo.ChunkData.Blocks.Num())
+			// If it is already loading or has been loaded, do not repeat the request
+			return;
 		}
-		else
-		{
-			FChunkInfo& Info = ChunkMap[ChunkCoords];
-			if (Info.LoadState != EChunkLoadState::UNLOADED)
-			{
-				// If it is already loading or has been loaded, do not repeat the request
-				return;
-			}
-			Info.LoadState = EChunkLoadState::LOADING;
-		}
+		Info.LoadState = EChunkLoadState::LOADING;
 	}
 
 
@@ -295,8 +261,6 @@ void UEnigmaWorld::BeginLoadChunkAsync(const FIntVector& ChunkCoords)
 	      {
 		      AsyncTask(ENamedThreads::GameThread, [this, ChunkCoords]()
 		      {
-			      FScopeLock Lock(&ChunkMapMutex);
-
 			      // Chunk may have been unloaded while executing in the background => Check
 			      if (!ChunkMap.Contains(ChunkCoords))
 				      return;
@@ -323,9 +287,8 @@ void UEnigmaWorld::BeginLoadChunkAsync(const FIntVector& ChunkCoords)
 				      // Move the background data to this MeshRef
 				      // MoveTemp can avoid copying, but make sure you don't use Info.ChunkData.BuiltMeshData.Mesh again
 				      MeshRef = Info.ChunkData.BuiltMeshData.Mesh;
-
-				      NewChunkActor->GetDynamicMeshComponent()->NotifyMeshUpdated();
 				      NewChunkActor->UpdateChunkMaterial(Info.ChunkData);
+				      NewChunkActor->GetDynamicMeshComponent()->NotifyMeshUpdated();
 				      // NewChunkActor->GetDynamicMeshComponent()->UpdateCollision();
 			      }
 
@@ -335,6 +298,42 @@ void UEnigmaWorld::BeginLoadChunkAsync(const FIntVector& ChunkCoords)
 			      UE_LOG(LogEnigmaVoxelChunk, Display, TEXT("Loaded Chunk at ChunkPos= [ %s ]"), *ChunkCoords.ToString())
 		      });
 	      });
+}
+
+void UEnigmaWorld::UpdateChunkAsync(const FIntVector& ChunkCoords)
+{
+	FChunkInfo& Info = ChunkMap[ChunkCoords];
+	if (Info.bIsDirty && Info.LoadState == EChunkLoadState::LOADED)
+	{
+		Info.bIsDirty = false;
+		Async(EAsyncExecution::ThreadPool,
+		      [this, ChunkCoords]()
+		      {
+			      FScopeLock Lock(&ChunkMapMutex);
+			      if (!ChunkMap.Contains(ChunkCoords))
+				      return;
+			      FChunkInfo& InfoRef = ChunkMap[ChunkCoords];
+			      RebuildChunkMeshData(InfoRef);
+		      },
+		      [this, ChunkCoords]() // Update the chunk mesh data in the main thread
+		      {
+			      AsyncTask(ENamedThreads::GameThread, [this, ChunkCoords]()
+			      {
+				      //FScopeLock Lock(&ChunkMapMutex);
+				      if (!ChunkMap.Contains(ChunkCoords))
+					      return;
+				      FChunkInfo& InfoRef = ChunkMap[ChunkCoords];
+				      if (!LoadedChunks.Contains(ChunkCoords))
+					      return;
+				      AChunkActor*   chunk   = LoadedChunks[ChunkCoords];
+				      UDynamicMesh*  DynMesh = chunk->GetDynamicMeshComponent()->GetDynamicMesh();
+				      FDynamicMesh3& MeshRef = DynMesh->GetMeshRef();
+				      MeshRef                = InfoRef.ChunkData.BuiltMeshData.Mesh;
+				      chunk->UpdateChunkMaterial(InfoRef.ChunkData);
+				      chunk->GetDynamicMeshComponent()->NotifyMeshUpdated();
+			      });
+		      });
+	}
 }
 
 bool UEnigmaWorld::AddEntity(APawn* InEntity)

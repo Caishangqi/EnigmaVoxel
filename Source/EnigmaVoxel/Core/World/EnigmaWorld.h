@@ -64,12 +64,13 @@ public:
 	void UpdateStreamingChunks();
 	DEPRECATED_MACRO(1.2, "The Method is deprecated, please use BeginLoadChunkAsync() instead")
 	AChunkActor* LoadChunk(const FIntVector& ChunkCoords);
-	bool    UnloadChunk(const FIntVector& ChunkCoords);
+	bool         UnloadChunk(const FIntVector& ChunkCoords);
 
 	// Async
 	void RebuildChunkMeshData(FChunkInfo& InOutChunkInfo);
 	void GenerateChunkDataAsync(FChunkData& InOutChunkData);
 	void BeginLoadChunkAsync(const FIntVector& ChunkCoords);
+	void UpdateChunkAsync(const FIntVector& ChunkCoords);
 	///
 
 	/// Entity Management
