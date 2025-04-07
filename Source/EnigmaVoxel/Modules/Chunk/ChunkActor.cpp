@@ -144,16 +144,9 @@ bool AChunkActor::UpdateChunk()
 
 bool AChunkActor::UpdateChunkMaterial(FChunkData& InChunkData)
 {
-	for (int32 SlotIndex = 0; SlotIndex < InChunkData.CollectedMaterials.Num(); SlotIndex++)
+	for (TTuple<UMaterialInterface*, int> ToSectionMap : InChunkData.MaterialToSectionMap)
 	{
-		for (TTuple<UMaterialInterface*, int> MaterialToSectionMap : InChunkData.MaterialToSectionMap)
-		{
-			DynamicMeshComponent->SetMaterial(MaterialToSectionMap.Value, MaterialToSectionMap.Key);
-		}
-		/*if (InChunkData.CollectedMaterials[SlotIndex])
-		{
-			DynamicMeshComponent->SetMaterial(SlotIndex, InChunkData.CollectedMaterials[SlotIndex]);
-		}*/
+		DynamicMeshComponent->SetMaterial(ToSectionMap.Value, ToSectionMap.Key);
 	}
 	return true;
 }
