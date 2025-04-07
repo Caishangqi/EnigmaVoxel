@@ -5,7 +5,7 @@
 #include "Block.generated.h"
 
 enum class EBlockDirection : uint8;
-// 一个简单的结构体，用于表示区块中单个方块实例
+
 USTRUCT(BlueprintType)
 struct FBlock
 {

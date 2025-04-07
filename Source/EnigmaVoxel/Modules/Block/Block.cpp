@@ -14,7 +14,7 @@ UMaterialInterface* FBlock::GetFacesMaterial(EBlockDirection Direction) const
 	FBlockVariantDefinition* Variant = Definition->BlockState.Variants.Find(BlockStateKey);
 	if (!Variant)
 	{
-		Variant = Definition->BlockState.Variants.Find(TEXT("")); // fallback 默认 key
+		Variant = Definition->BlockState.Variants.Find(TEXT("")); // fallback default key
 		if (!Variant)
 		{
 			UE_LOG(LogEnigmaVoxelBlock, Warning, TEXT("Cannot find variant for key '%s' in block '%s'"), *BlockStateKey, *Definition->GetName());
@@ -22,7 +22,7 @@ UMaterialInterface* FBlock::GetFacesMaterial(EBlockDirection Direction) const
 		}
 	}
 
-	UStaticMesh* Mesh = Variant->Model.LoadSynchronous(); // 强制加载
+	UStaticMesh* Mesh = Variant->Model.LoadSynchronous();
 	if (!Mesh)
 	{
 		UE_LOG(LogEnigmaVoxelBlock, Error, TEXT("Block mesh is null for block '%s'"), *Definition->GetName());
