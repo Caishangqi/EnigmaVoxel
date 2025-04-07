@@ -13,7 +13,6 @@ FChunkData::FChunkData(): ChunkCoords(FIntVector::ZeroValue)
 {
 	int32 Size = ChunkDimension.X * ChunkDimension.Y * ChunkDimension.Z;
 	Blocks.SetNum(Size);
-	CollectedMaterials.SetNum(Size);
 	MaterialToSectionMap.Reserve(Size);
 }
 
@@ -63,11 +62,9 @@ bool FChunkData::FillChunkWithArea(FIntVector fillArea, FString Namespace, FStri
 
 bool FChunkData::RefreshMaterialData()
 {
-	CollectedMaterials.Empty();
 	MaterialToSectionMap.Empty();
 	NextSectionIndex = 0;
 	int32 Size       = ChunkDimension.X * ChunkDimension.Y * ChunkDimension.Z;
-	CollectedMaterials.SetNum(Size);
 	MaterialToSectionMap.Reserve(Size);
 	return true;
 }
@@ -83,7 +80,7 @@ int32 FChunkData::GetSectionIndexForMaterial(UMaterialInterface* InMaterial)
 	int32* FoundIndex = MaterialToSectionMap.Find(InMaterial);
 	if (FoundIndex)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("FoundIndex = %d"), *FoundIndex);
+		UE_LOG(LogTemp, Warning, TEXT("FoundIndex = %d"), *FoundIndex)
 		return *FoundIndex;
 	}
 	else
@@ -91,13 +88,6 @@ int32 FChunkData::GetSectionIndexForMaterial(UMaterialInterface* InMaterial)
 		// 否则 => 创建新的 SectionIndex
 		int32 NewSectionIndex = NextSectionIndex++;
 		MaterialToSectionMap.Add(InMaterial, NewSectionIndex);
-
-		// 确保 CollectedMaterials 容器能放这个下标
-		/*if (CollectedMaterials.Num() <= NewSectionIndex)
-		{
-			CollectedMaterials.SetNum(NewSectionIndex + 1, EAllowShrinking::Yes);
-		}*/
-		//CollectedMaterials[NewSectionIndex] = InMaterial;
 		return NewSectionIndex;
 	}
 }
@@ -369,7 +359,8 @@ void AppendBoxForBlock(UE::Geometry::FDynamicMesh3& Mesh, const FBlock& Block, F
 	// +Z faces => EBlockDirection::UP
 	if (IsFaceVisibleInChunkData(ChunkData, blockPos.X, blockPos.Y, blockPos.Z, EBlockDirection::UP))
 	{
-		int sectionID = ChunkData.GetSectionIndexForMaterial(Block.GetFacesMaterial(EBlockDirection::UP));
+		UMaterialInterface * material = Block.GetFacesMaterial(EBlockDirection::UP);
+		int sectionID = ChunkData.GetSectionIndexForMaterial(material);
 		Mesh.AppendTriangle(v2, v3, v6, sectionID);
 		Mesh.AppendTriangle(v2, v6, v7, sectionID);
 	}

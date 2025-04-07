@@ -53,16 +53,12 @@ public:
 	// Constructed visible mesh data (can be passed directly to the game thread after the background thread has completed the generation)
 	FChunkMeshData BuiltMeshData;
 
-	// 用来记录：某个材质对应的 SectionIndex（在网格里即 GroupID）。
-	// 当网格渲染时，如果多个三角形共用同一个 SectionIndex，就视为使用同一材质。
+	// Used to record: SectionIndex corresponding to a material (GroupID in the mesh).
+	// When the mesh is rendered, if multiple triangles share the same SectionIndex, they are considered to use the same material.
 	UPROPERTY()
 	TMap<UMaterialInterface*, int32> MaterialToSectionMap;
 
-	// 存放实际要给组件设置的材质列表（对应 SectionIndex）
-	UPROPERTY()
-	TArray<UMaterialInterface*> CollectedMaterials;
-
-	// 动态分配下一个可用的 Section 索引
+	// Dynamically allocate the next available Section index
 	int32 NextSectionIndex = 0;
 
 public:
@@ -81,14 +77,11 @@ public:
 
 struct FChunkInfo
 {
-	EChunkLoadState LoadState;
+	EChunkLoadState LoadState = EChunkLoadState::UNLOADED;
 	FChunkData      ChunkData;
 	bool            bIsDirty = false; // Need mesh rebuild
 
-	FChunkInfo()
-		: LoadState(EChunkLoadState::UNLOADED)
-	{
-	}
+	FChunkInfo();
 };
 
 bool IsFaceVisibleInChunkData(const FChunkData& ChunkData, int x, int y, int z, EBlockDirection Direction);
