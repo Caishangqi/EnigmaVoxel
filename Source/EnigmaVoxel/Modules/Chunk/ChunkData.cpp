@@ -62,10 +62,8 @@ bool FChunkData::FillChunkWithArea(FIntVector fillArea, FString Namespace, FStri
 
 bool FChunkData::RefreshMaterialData()
 {
-	MaterialToSectionMap.Empty();
+	MaterialToSectionMap.Reset();
 	NextSectionIndex = 0;
-	int32 Size       = ChunkDimension.X * ChunkDimension.Y * ChunkDimension.Z;
-	MaterialToSectionMap.Reserve(Size);
 	return true;
 }
 
@@ -77,19 +75,19 @@ int32 FChunkData::GetSectionIndexForMaterial(UMaterialInterface* InMaterial)
 		UE_LOG(LogEnigmaVoxelChunk, Warning, TEXT("GetSectionIndexForMaterial called with nullptr!"));
 		return -1;
 	}
-	int32* FoundIndex = MaterialToSectionMap.Find(InMaterial);
-	if (FoundIndex)
+	for (TTuple<UMaterialInterface*, int>& ToSectionMap : MaterialToSectionMap)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("FoundIndex = %d"), *FoundIndex)
-		return *FoundIndex;
+		if (ToSectionMap.Key == InMaterial)
+		{
+			//UE_LOG(LogTemp, Warning, TEXT("FoundIndex = %d"), ToSectionMap.Value)
+			return ToSectionMap.Value;
+		}
 	}
-	else
-	{
-		// 否则 => 创建新的 SectionIndex
-		int32 NewSectionIndex = NextSectionIndex++;
-		MaterialToSectionMap.Add(InMaterial, NewSectionIndex);
-		return NewSectionIndex;
-	}
+	// 否则 => 创建新的 SectionIndex
+	NextSectionIndex      = NextSectionIndex + 1;
+	int32 NewSectionIndex = NextSectionIndex;
+	MaterialToSectionMap.Add(InMaterial, NewSectionIndex);
+	return NewSectionIndex;
 }
 
 
@@ -359,8 +357,8 @@ void AppendBoxForBlock(UE::Geometry::FDynamicMesh3& Mesh, const FBlock& Block, F
 	// +Z faces => EBlockDirection::UP
 	if (IsFaceVisibleInChunkData(ChunkData, blockPos.X, blockPos.Y, blockPos.Z, EBlockDirection::UP))
 	{
-		UMaterialInterface * material = Block.GetFacesMaterial(EBlockDirection::UP);
-		int sectionID = ChunkData.GetSectionIndexForMaterial(material);
+		UMaterialInterface* material  = Block.GetFacesMaterial(EBlockDirection::UP);
+		int                 sectionID = ChunkData.GetSectionIndexForMaterial(material);
 		Mesh.AppendTriangle(v2, v3, v6, sectionID);
 		Mesh.AppendTriangle(v2, v6, v7, sectionID);
 	}

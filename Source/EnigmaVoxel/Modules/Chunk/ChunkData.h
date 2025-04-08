@@ -80,8 +80,6 @@ struct FChunkInfo
 	EChunkLoadState LoadState = EChunkLoadState::UNLOADED;
 	FChunkData      ChunkData;
 	bool            bIsDirty = false; // Need mesh rebuild
-
-	FChunkInfo();
 };
 
 bool IsFaceVisibleInChunkData(const FChunkData& ChunkData, int x, int y, int z, EBlockDirection Direction);
