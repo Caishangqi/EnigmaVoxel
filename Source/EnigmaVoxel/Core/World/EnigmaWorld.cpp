@@ -5,6 +5,8 @@
 
 #include "EnigmaVoxel/Core/EVGameInstance.h"
 #include "EnigmaVoxel/Core/Log/DefinedLog.h"
+#include "EnigmaVoxel/Modules/Chunk/ChunkAsyncTask.h"
+#include "Thread/ChunkWorkerPool.h"
 
 UWorld* UEnigmaWorld::GetWorld() const
 {
@@ -15,7 +17,9 @@ bool UEnigmaWorld::SetUWorldTarget(UWorld* UnrealBuildInWorld)
 {
 	CurrentUWorld = UnrealBuildInWorld;
 	if (CurrentUWorld == nullptr)
+	{
 		return false;
+	}
 	return true;
 }
 
@@ -23,7 +27,9 @@ bool UEnigmaWorld::SetEnableWorldTick(bool Enable)
 {
 	EnableWorldTick = Enable;
 	if (EnableWorldTick)
+	{
 		return true;
+	}
 	return false;
 }
 
@@ -58,7 +64,19 @@ void UEnigmaWorld::NotifyNeighborsChunkLoaded(FIntVector ChunkCoords)
 
 UEnigmaWorld::UEnigmaWorld()
 {
+	InitializeChunkWorkerPool();
 }
+
+void UEnigmaWorld::BeginDestroy()
+{
+	if (ChunkWorkerPool)
+	{
+		ChunkWorkerPool->RequestExit(); // 标记 + Trigger
+		ChunkWorkerPool->Shutdown(); // 等待全部线程安全退出
+	}
+	Super::BeginDestroy();
+}
+
 
 void UEnigmaWorld::UpdateStreamingChunks()
 {
@@ -69,10 +87,13 @@ void UEnigmaWorld::UpdateStreamingChunks()
 	}
 
 	TSet<FIntVector> DesiredChunkCoords;
-	const int32      LoadRadius = 3;
+	constexpr int32  LoadRadius = 3;
 	for (APawn* Pawn : Players)
 	{
-		if (!Pawn) continue;
+		if (!Pawn)
+		{
+			continue;
+		}
 
 		FVector    PawnLocation      = Pawn->GetActorLocation();
 		FIntVector CenterChunkCoords = WorldPosToChunkCoords(PawnLocation);
@@ -96,17 +117,24 @@ void UEnigmaWorld::UpdateStreamingChunks()
 
 	TSet<FIntVector> ToLoad   = DesiredChunkCoords.Difference(ExistingChunks);
 	TSet<FIntVector> ToUnload = ExistingChunks.Difference(DesiredChunkCoords);
+
+
+	/*FAsyncTask<FChunkAsyncTask>* chunkTask = new FAsyncTask<FChunkAsyncTask>(this, Load);
+	chunkTask->StartBackgroundTask(ChunkWorkerThreadPool.Get());*/
+
 	/// We constantly check the dirty chunk, if we found the dirty chunk we
 	/// rebuild their data based on its current blockdata and neibourhood state
 
-	for (int i = 0; i < ChunkMap.Num(); ++i)
+	/*TMap<FIntVector, FChunkInfo> TempMap = CopyTemp(ChunkMap);
+	for (int i = 0; i < TempMap.Num(); ++i)
 	{
 		TArray<FIntVector> ChunkCoords;
-		ChunkMap.GetKeys(ChunkCoords);
+		TempMap.GetKeys(ChunkCoords);
 		UpdateChunkAsync(ChunkCoords[i]);
-	}
+	}*/
 
-	for (const FIntVector& ChunkCoords : ToLoad)
+	/*TSet<FIntVector> ToLoadTemp = CopyTemp(ToLoad);
+	for (const FIntVector& ChunkCoords : ToLoadTemp)
 	{
 		BeginLoadChunkAsync(ChunkCoords);
 	}
@@ -115,12 +143,15 @@ void UEnigmaWorld::UpdateStreamingChunks()
 	for (const FIntVector& ChunkCoords : ToUnload)
 	{
 		UnloadChunk(ChunkCoords);
-	}
+	}*/
 }
 
 AChunkActor* UEnigmaWorld::LoadChunk(const FIntVector& ChunkCoords)
 {
-	if (!CurrentUWorld) return nullptr;
+	if (!CurrentUWorld)
+	{
+		return nullptr;
+	}
 
 	if (LoadedChunks.Contains(ChunkCoords))
 	{
@@ -129,7 +160,7 @@ AChunkActor* UEnigmaWorld::LoadChunk(const FIntVector& ChunkCoords)
 
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	FVector      ChunkOrigin((float)(ChunkCoords.X) * 1600.f, (float)(ChunkCoords.Y) * 1600.f, (float)(ChunkCoords.Z) * 1600.f);
+	FVector      ChunkOrigin(static_cast<float>(ChunkCoords.X) * 1600.f, static_cast<float>(ChunkCoords.Y) * 1600.f, static_cast<float>(ChunkCoords.Z) * 1600.f);
 	AChunkActor* NewChunkActor = CurrentUWorld->SpawnActor<AChunkActor>(AChunkActor::StaticClass(), ChunkOrigin, FRotator::ZeroRotator, SpawnParams);
 	if (NewChunkActor)
 	{
@@ -240,9 +271,15 @@ void UEnigmaWorld::BeginLoadChunkAsync(const FIntVector& ChunkCoords)
 		      else
 		      {
 			      FChunkInfo& Info = ChunkMap[ChunkCoords];
+			      if (Info.LoadState == EChunkLoadState::LOADING)
+			      {
+				      ChunkMapMutex.Unlock();
+				      return;
+			      }
 			      if (Info.LoadState != EChunkLoadState::UNLOADED)
 			      {
 				      // If it is already loading or has been loaded, do not repeat the request
+				      ChunkMapMutex.Unlock();
 				      return;
 			      }
 			      Info.LoadState = EChunkLoadState::LOADING;
@@ -262,20 +299,26 @@ void UEnigmaWorld::BeginLoadChunkAsync(const FIntVector& ChunkCoords)
 		      {
 			      // Chunk may have been unloaded while executing in the background => Check
 			      if (!ChunkMap.Contains(ChunkCoords))
+			      {
 				      return;
+			      }
 
 			      FChunkInfo& Info = ChunkMap[ChunkCoords];
 			      if (Info.LoadState != EChunkLoadState::LOADING)
+			      {
 				      return; // May be marked as UNLOADED during background operation
+			      }
 			      Info.LoadState = EChunkLoadState::LOADED;
 			      /// Prepare spawn Chunk Actor
 			      FActorSpawnParameters SpawnParams;
 			      SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-			      FVector      ChunkOrigin(float(ChunkCoords.X) * 1600.f, float(ChunkCoords.Y) * 1600.f, 0.f);
+			      FVector      ChunkOrigin(static_cast<float>(ChunkCoords.X) * 1600.f, static_cast<float>(ChunkCoords.Y) * 1600.f, 0.f);
 			      AChunkActor* NewChunkActor = CurrentUWorld->SpawnActor<AChunkActor>(AChunkActor::StaticClass(), ChunkOrigin, FRotator::ZeroRotator, SpawnParams);
 
 			      if (!NewChunkActor)
+			      {
 				      return;
+			      }
 			      ///
 
 			      // Assign the Mesh generated by the background thread to AChunkActor->DynamicMeshComponent
@@ -308,7 +351,9 @@ void UEnigmaWorld::UpdateChunkAsync(const FIntVector& ChunkCoords)
 		      {
 			      ChunkMapMutex.Lock();
 			      if (!ChunkMap.Contains(ChunkCoords))
+			      {
 				      return;
+			      }
 			      FChunkInfo& InfoRef = ChunkMap[ChunkCoords];
 			      InfoRef.bIsDirty    = false;
 			      RebuildChunkMeshData(InfoRef);
@@ -319,10 +364,14 @@ void UEnigmaWorld::UpdateChunkAsync(const FIntVector& ChunkCoords)
 			      AsyncTask(ENamedThreads::GameThread, [this, ChunkCoords]()
 			      {
 				      if (!ChunkMap.Contains(ChunkCoords))
+				      {
 					      return;
+				      }
 				      FChunkInfo& InfoRef = ChunkMap[ChunkCoords];
 				      if (!LoadedChunks.Contains(ChunkCoords))
+				      {
 					      return;
+				      }
 				      AChunkActor*   chunk   = LoadedChunks[ChunkCoords];
 				      UDynamicMesh*  DynMesh = chunk->GetDynamicMeshComponent()->GetDynamicMesh();
 				      FDynamicMesh3& MeshRef = DynMesh->GetMeshRef();
@@ -354,27 +403,42 @@ bool UEnigmaWorld::RemoveEntity(APawn* InEntity)
 	return true;
 }
 
+void UEnigmaWorld::InitializeChunkWorkerPool()
+{
+	ChunkWorkerPool = NewObject<UChunkWorkerPool>(this, "ChunkWorkerPool");
+	ChunkWorkerPool->Init(6);
+}
+
+void UEnigmaWorld::ShutdownChunkWorkerPool()
+{
+	if (ChunkWorkerPool)
+	{
+		ChunkWorkerPool->RequestExit(); // 让线程自退
+		ChunkWorkerPool->Shutdown(); // Join
+	}
+}
+
 FIntVector UEnigmaWorld::WorldPosToChunkCoords(const FVector& WorldPos)
 {
-	int32 ChunkX = (int32)FMath::FloorToInt(WorldPos.X / ChunkWorldSize);
-	int32 ChunkY = (int32)FMath::FloorToInt(WorldPos.Y / ChunkWorldSize);
+	int32 ChunkX = static_cast<int32>(FMath::FloorToInt(WorldPos.X / ChunkWorldSize));
+	int32 ChunkY = static_cast<int32>(FMath::FloorToInt(WorldPos.Y / ChunkWorldSize));
 	return FIntVector(ChunkX, ChunkY, 0);
 }
 
 FIntVector UEnigmaWorld::BlockPosToChunkCoords(const FIntVector& BlockPos)
 {
-	return WorldPosToChunkCoords(FVector((float)BlockPos.X * BlockWorldSize, (float)BlockPos.Y * BlockWorldSize, (float)BlockPos.Z * BlockWorldSize));
+	return WorldPosToChunkCoords(FVector(static_cast<float>(BlockPos.X) * BlockWorldSize, static_cast<float>(BlockPos.Y) * BlockWorldSize, static_cast<float>(BlockPos.Z) * BlockWorldSize));
 }
 
 FIntVector UEnigmaWorld::WorldPosToChunkLocalCoords(const FVector& WorldPos)
 {
 	FIntVector chunkCoords = WorldPosToChunkCoords(WorldPos);
 	// 计算 chunkWorldOrigin = (chunkCoords * ChunkWorldSize)
-	FVector chunkWorldOrigin(float(chunkCoords.X) * ChunkWorldSize, float(chunkCoords.Y) * ChunkWorldSize, 0.f);
+	FVector chunkWorldOrigin(static_cast<float>(chunkCoords.X) * ChunkWorldSize, static_cast<float>(chunkCoords.Y) * ChunkWorldSize, 0.f);
 	// 然后 (WorldPos - chunkWorldOrigin) / BlockWorldSize 就是相对于 chunk 的本地 block 索引
-	float localBlockX = (float)(WorldPos.X - chunkWorldOrigin.X) / BlockWorldSize;
-	float localBlockY = (float)(WorldPos.Y - chunkWorldOrigin.Y) / BlockWorldSize;
-	float localBlockZ = (float)(WorldPos.Z - chunkWorldOrigin.Z) / BlockWorldSize;
+	float localBlockX = static_cast<float>(WorldPos.X - chunkWorldOrigin.X) / BlockWorldSize;
+	float localBlockY = static_cast<float>(WorldPos.Y - chunkWorldOrigin.Y) / BlockWorldSize;
+	float localBlockZ = static_cast<float>(WorldPos.Z - chunkWorldOrigin.Z) / BlockWorldSize;
 
 	int32 lx = FMath::FloorToInt(localBlockX); // 0 ~ 15
 	int32 ly = FMath::FloorToInt(localBlockY); // 0 ~ 15
@@ -391,7 +455,7 @@ FIntVector UEnigmaWorld::WorldPosToChunkLocalCoords(const FVector& WorldPos)
 
 FIntVector UEnigmaWorld::BlockPosToChunkLocalCoords(const FIntVector& BlockPos)
 {
-	return WorldPosToChunkLocalCoords(FVector((float)BlockPos.X * BlockWorldSize, (float)BlockPos.Y * BlockWorldSize, (float)BlockPos.Z * BlockWorldSize));
+	return WorldPosToChunkLocalCoords(FVector(static_cast<float>(BlockPos.X) * BlockWorldSize, static_cast<float>(BlockPos.Y) * BlockWorldSize, static_cast<float>(BlockPos.Z) * BlockWorldSize));
 }
 
 UBlockDefinition* UEnigmaWorld::GetBlockAtWorldPos(const FVector& WorldPos)
@@ -430,5 +494,5 @@ UBlockDefinition* UEnigmaWorld::GetBlockAtWorldPos(const FVector& WorldPos)
 
 UBlockDefinition* UEnigmaWorld::GetBlockAtBlockPos(const FIntVector& BlockPos)
 {
-	return GetBlockAtWorldPos(FVector((float)BlockPos.X * BlockWorldSize, (float)BlockPos.Y * BlockWorldSize, (float)BlockPos.Z * BlockWorldSize));
+	return GetBlockAtWorldPos(FVector(static_cast<float>(BlockPos.X) * BlockWorldSize, static_cast<float>(BlockPos.Y) * BlockWorldSize, static_cast<float>(BlockPos.Z) * BlockWorldSize));
 }

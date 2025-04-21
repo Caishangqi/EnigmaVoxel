@@ -1,11 +1,14 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "Containers/Deque.h"
 #include "EnigmaVoxel/Modules/Chunk/ChunkActor.h"
+#include "EnigmaVoxel/Modules/Chunk/ChunkAsyncTask.h"
 #include "EnigmaVoxel/Modules/Chunk/ChunkData.h"
 #include "UObject/Object.h"
 #include "EnigmaWorld.generated.h"
 
+class UChunkWorkerPool;
 /**
  * UEnigmaWorld 当成“逻辑和数据管理器”，在内部维护 Chunk 的数据结构，然后在需要显示或碰撞时，委托 UWorld 生成真正的 Actor。
  * 这样的设计也和 Minecraft 或 NeoForge Mod 十分类似：“世界数据”（你的 UEnigmaWorld） + “底层真实世界”（Unreal 的 UWorld）。
@@ -20,6 +23,7 @@ class ENIGMAVOXEL_API UEnigmaWorld : public UObject
 
 public:
 	UEnigmaWorld();
+	virtual void BeginDestroy() override;
 
 	virtual UWorld* GetWorld() const override;
 
@@ -33,7 +37,6 @@ public:
 
 	mutable FCriticalSection ChunkMapMutex;
 
-public:
 	UFUNCTION(BlueprintCallable, Category="World")
 	bool SetUWorldTarget(UWorld* UnrealBuildInWorld);
 	UFUNCTION(BlueprintCallable, Category="World")
@@ -81,10 +84,19 @@ public:
 
 	/// 
 
+	/// Thread Management
+	void InitializeChunkWorkerPool();
+	void ShutdownChunkWorkerPool();
 
 protected:
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category="World")
 	TObjectPtr<UWorld> CurrentUWorld = nullptr;
 
 	bool EnableWorldTick = true;
+
+private:
+	/// Thread Pool and Workers
+	UPROPERTY()
+	TObjectPtr<UChunkWorkerPool> ChunkWorkerPool = nullptr;
+	TQueue<FIntVector>           PendingChunks;
 };
