@@ -6,3 +6,4 @@ DEFINE_LOG_CATEGORY(LogEnigmaVoxelRegister);
 DEFINE_LOG_CATEGORY(LogEnigmaVoxelChunk);
 DEFINE_LOG_CATEGORY(LogEnigmaVoxelWorld);
 DEFINE_LOG_CATEGORY(LogEnigmaVoxelBlock)
+DEFINE_LOG_CATEGORY(LogEnigmaVoxelWorker)
