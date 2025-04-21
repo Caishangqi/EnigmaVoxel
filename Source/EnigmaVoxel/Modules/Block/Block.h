@@ -11,7 +11,6 @@ struct FBlock
 {
 	GENERATED_BODY()
 
-public:
 	// 指向全局注册的方块定义
 	UPROPERTY(BlueprintReadWrite)
 	TObjectPtr<UBlockDefinition> Definition = nullptr;

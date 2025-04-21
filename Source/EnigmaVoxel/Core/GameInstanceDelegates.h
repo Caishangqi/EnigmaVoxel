@@ -6,5 +6,4 @@
 struct ENIGMAVOXEL_API FGameInstanceDelegates
 {
 	FGameInstanceDelegates() = delete;
-	
 };

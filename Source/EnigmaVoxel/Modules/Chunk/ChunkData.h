@@ -19,7 +19,6 @@ struct FChunkMeshData
 {
 	GENERATED_BODY()
 
-public:
 	UE::Geometry::FDynamicMesh3 Mesh;
 };
 
@@ -29,7 +28,6 @@ struct FChunkData
 {
 	GENERATED_BODY()
 
-public:
 	// Chunk world coordinates (in Chunks)
 	UPROPERTY()
 	FIntVector ChunkCoords;
@@ -61,7 +59,6 @@ public:
 	// Dynamically allocate the next available Section index
 	int32 NextSectionIndex = 0;
 
-public:
 	FChunkData();
 
 	int32         GetBlockIndex(const FIntVector& LocalCoords) const;

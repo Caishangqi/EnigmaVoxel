@@ -31,7 +31,5 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Chunk")
 	FTimerHandle TimerHandle;
 
-public:
-	void OnPlayerJoinWorld(int32 WorldIndex, AActor * Player);
-private:
+	void OnPlayerJoinWorld(int32 WorldIndex, AActor* Player);
 };

@@ -19,7 +19,7 @@ AEnigmaVoxelGameMode::AEnigmaVoxelGameMode()
 
 	// set default controller to our Blueprinted controller
 	static ConstructorHelpers::FClassFinder<APlayerController> PlayerControllerBPClass(TEXT("/Game/TopDown/Blueprints/BP_TopDownPlayerController"));
-	if(PlayerControllerBPClass.Class != NULL)
+	if (PlayerControllerBPClass.Class != nullptr)
 	{
 		PlayerControllerClass = PlayerControllerBPClass.Class;
 	}

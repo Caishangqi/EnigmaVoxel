@@ -7,7 +7,6 @@ struct FBlockVariantDefinition
 {
 	GENERATED_BODY()
 
-public:
 	// This is where the reference to the Mesh is stored. It can be a direct UStaticMesh* or a TSoftObjectPtr<UStaticMesh>
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block State")
 	TSoftObjectPtr<UStaticMesh> Model;
@@ -24,7 +23,6 @@ struct FBlockState
 {
 	GENERATED_BODY()
 
-public:
 	// In Minecraft JSON: "variants": { "facing=north": {...}, "facing=south": {...} }
 	// Use FString as key here, can also use FName
 	// The value is the FBlockVariantDefinition you defined above, including Mesh/material, etc.

@@ -22,7 +22,6 @@ class ENIGMAVOXEL_API UBlockDefinition : public UDefinition
 public:
 	UBlockDefinition();
 
-public:
 	/// Internal Block ID, use for chunk storage
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category="Block Definition")
 	int64 BlockID = 0;
@@ -32,7 +31,7 @@ public:
 	ECollisionType CollisionType = ECollisionType::UNIT_BLOCK;
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category="Block Definition")
 	bool bIsOpaque = false;
-	
+
 	///If you want to distinguish multiple block states files like Minecraft (such as multiple "subtypes"), you can also change
 	///it to TArray<FBlockState> or TMap<FString, FBlockState>; but most of the time "one block → one block state + multiple
 	///variants" is enough.
@@ -43,9 +42,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Block Definition")
 	int32 DefaultStateID = 0;
 
-public:
 	/// We like Minecraft so we use their method
-	/// Destroy logic could look Neo forge implementation quite perfect
+		/// Destroy logic could look Neo forge implementation quite perfect
 
 	/// OnFinishDestroy
 	/// OnBeginDestroy

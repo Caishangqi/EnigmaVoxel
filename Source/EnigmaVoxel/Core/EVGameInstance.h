@@ -25,7 +25,6 @@ public:
 	virtual void                   Init() override;
 	virtual FGameInstancePIEResult InitializeForPlayInEditor(int32 PIEInstanceIndex, const FGameInstancePIEParameters& Params) override;
 
-public:
 	UFUNCTION(BlueprintNativeEvent)
 	void OnRegistrationInitialize();
 

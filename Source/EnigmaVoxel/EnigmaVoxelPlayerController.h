@@ -33,7 +33,7 @@ public:
 	/** MappingContext */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
 	UInputMappingContext* DefaultMappingContext;
-	
+
 	/** Jump Input Action */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
 	UInputAction* SetDestinationClickAction;
@@ -47,9 +47,9 @@ protected:
 	uint32 bMoveToMouseCursor : 1;
 
 	virtual void SetupInputComponent() override;
-	
+
 	// To add mapping context
-	virtual void BeginPlay();
+	virtual void BeginPlay() override;
 
 	/** Input handlers for SetDestination action. */
 	void OnInputStarted();
@@ -61,8 +61,6 @@ protected:
 private:
 	FVector CachedDestination;
 
-	bool bIsTouch; // Is it a touch device
+	bool  bIsTouch; // Is it a touch device
 	float FollowTime; // For how long it has been pressed
 };
-
-

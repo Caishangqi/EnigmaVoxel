@@ -61,45 +61,69 @@ bool AChunkActor::IsVisibleFace(FBlock& currentBlock, EBlockDirection InDirectio
 	{
 	case EBlockDirection::NORTH:
 		if (blockPos.X + 1 >= ChunkDimension.X)
+		{
 			return true;
+		}
 		blockPos.X += 1;
 		if (GetBlockAt(blockPos).Definition == nullptr)
+		{
 			return true;
+		}
 		return false;
 	case EBlockDirection::SOUTH:
 		if (blockPos.X - 1 < 0)
+		{
 			return true;
+		}
 		blockPos.X -= 1;
 		if (GetBlockAt(blockPos).Definition == nullptr)
+		{
 			return true;
+		}
 		return false;
 	case EBlockDirection::EAST:
 		if (blockPos.Y + 1 >= ChunkDimension.Y)
+		{
 			return true;
+		}
 		blockPos.Y += 1;
 		if (GetBlockAt(blockPos).Definition == nullptr)
+		{
 			return true;
+		}
 		return false;
 	case EBlockDirection::WEST:
 		if (blockPos.Y - 1 < 0)
+		{
 			return true;
+		}
 		blockPos.Y -= 1;
 		if (GetBlockAt(blockPos).Definition == nullptr)
+		{
 			return true;
+		}
 		return false;
 	case EBlockDirection::UP:
 		if (blockPos.Z + 1 >= ChunkDimension.Z)
+		{
 			return true;
+		}
 		blockPos.Z += 1;
 		if (GetBlockAt(blockPos).Definition == nullptr)
+		{
 			return true;
+		}
 		return false;
 	case EBlockDirection::DOWN:
 		if (blockPos.Z - 1 < 0)
+		{
 			return true;
+		}
 		blockPos.Z -= 1;
 		if (GetBlockAt(blockPos).Definition == nullptr)
+		{
 			return true;
+		}
 		return false;
 	}
 	return false;

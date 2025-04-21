@@ -29,5 +29,5 @@ UDefinition* UContentRegister::GetDefinitionByID(FString id)
 			return Definition;
 		}
 	}
-	return NULL;
+	return nullptr;
 }

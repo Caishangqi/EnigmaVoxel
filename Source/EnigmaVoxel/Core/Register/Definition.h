@@ -18,6 +18,5 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FString ID;
 
-public:
 	UDefinition();
 };

@@ -45,11 +45,8 @@ UBlockRegister* UEnigmaRegistrationSubsystem::BLOCK(FString NameSpace)
 	{
 		return Cast<UBlockRegister>(registers.ResourceTypeRegister["Block"]);
 	}
-	else
-	{
-		registers.ResourceTypeRegister.Add("Block", NewObject<UBlockRegister>());
-		return Cast<UBlockRegister>(registers.ResourceTypeRegister["Block"]);
-	}
+	registers.ResourceTypeRegister.Add("Block", NewObject<UBlockRegister>());
+	return Cast<UBlockRegister>(registers.ResourceTypeRegister["Block"]);
 }
 
 UBlockDefinition* UEnigmaRegistrationSubsystem::BLOCK_GET_VALUE(FString NameSpace, FString ID)

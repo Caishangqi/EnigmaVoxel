@@ -18,14 +18,14 @@ AEnigmaVoxelCharacter::AEnigmaVoxelCharacter()
 
 	// Don't rotate character to camera direction
 	bUseControllerRotationPitch = false;
-	bUseControllerRotationYaw = false;
-	bUseControllerRotationRoll = false;
+	bUseControllerRotationYaw   = false;
+	bUseControllerRotationRoll  = false;
 
 	// Configure character movement
 	GetCharacterMovement()->bOrientRotationToMovement = true; // Rotate character to moving direction
-	GetCharacterMovement()->RotationRate = FRotator(0.f, 640.f, 0.f);
-	GetCharacterMovement()->bConstrainToPlane = true;
-	GetCharacterMovement()->bSnapToPlaneAtStart = true;
+	GetCharacterMovement()->RotationRate              = FRotator(0.f, 640.f, 0.f);
+	GetCharacterMovement()->bConstrainToPlane         = true;
+	GetCharacterMovement()->bSnapToPlaneAtStart       = true;
 
 	// Create a camera boom...
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
@@ -41,11 +41,11 @@ AEnigmaVoxelCharacter::AEnigmaVoxelCharacter()
 	TopDownCameraComponent->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
 	// Activate ticking in order to update the cursor every frame.
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick          = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
 }
 
 void AEnigmaVoxelCharacter::Tick(float DeltaSeconds)
 {
-    Super::Tick(DeltaSeconds);
+	Super::Tick(DeltaSeconds);
 }

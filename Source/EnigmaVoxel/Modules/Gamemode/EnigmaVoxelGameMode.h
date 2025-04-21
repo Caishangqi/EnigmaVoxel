@@ -14,6 +14,3 @@ class AEnigmaVoxelGameMode : public AGameModeBase
 public:
 	AEnigmaVoxelGameMode();
 };
-
-
-

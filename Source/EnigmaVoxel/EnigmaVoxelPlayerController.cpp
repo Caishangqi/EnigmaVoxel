@@ -16,10 +16,10 @@ DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
 AEnigmaVoxelPlayerController::AEnigmaVoxelPlayerController()
 {
-	bShowMouseCursor = true;
+	bShowMouseCursor   = true;
 	DefaultMouseCursor = EMouseCursor::Default;
-	CachedDestination = FVector::ZeroVector;
-	FollowTime = 0.f;
+	CachedDestination  = FVector::ZeroVector;
+	FollowTime         = 0.f;
 }
 
 void AEnigmaVoxelPlayerController::BeginPlay()
@@ -56,7 +56,10 @@ void AEnigmaVoxelPlayerController::SetupInputComponent()
 	}
 	else
 	{
-		UE_LOG(LogTemplateCharacter, Error, TEXT("'%s' Failed to find an Enhanced Input Component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
+		UE_LOG(LogTemplateCharacter, Error,
+		       TEXT(
+			       "'%s' Failed to find an Enhanced Input Component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."
+		       ), *GetNameSafe(this));
 	}
 }
 
@@ -70,17 +73,17 @@ void AEnigmaVoxelPlayerController::OnSetDestinationTriggered()
 {
 	// We flag that the input is being pressed
 	FollowTime += GetWorld()->GetDeltaSeconds();
-	
+
 	// We look for the location in the world where the player has pressed the input
 	FHitResult Hit;
-	bool bHitSuccessful = false;
+	bool       bHitSuccessful = false;
 	if (bIsTouch)
 	{
-		bHitSuccessful = GetHitResultUnderFinger(ETouchIndex::Touch1, ECollisionChannel::ECC_Visibility, true, Hit);
+		bHitSuccessful = GetHitResultUnderFinger(ETouchIndex::Touch1, ECC_Visibility, true, Hit);
 	}
 	else
 	{
-		bHitSuccessful = GetHitResultUnderCursor(ECollisionChannel::ECC_Visibility, true, Hit);
+		bHitSuccessful = GetHitResultUnderCursor(ECC_Visibility, true, Hit);
 	}
 
 	// If we hit a surface, cache the location
@@ -88,7 +91,7 @@ void AEnigmaVoxelPlayerController::OnSetDestinationTriggered()
 	{
 		CachedDestination = Hit.Location;
 	}
-	
+
 	// Move towards mouse pointer or touch
 	APawn* ControlledPawn = GetPawn();
 	if (ControlledPawn != nullptr)

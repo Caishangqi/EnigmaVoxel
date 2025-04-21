@@ -33,7 +33,6 @@ protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	TArray<FBlock> Blocks;
 
-protected:
 	UFUNCTION(BlueprintCallable)
 	int32 GetChunkBlockSize();
 
@@ -69,11 +68,10 @@ public:
 	/// @return whether or not rebuild successful
 	UFUNCTION(BlueprintCallable)
 	bool UpdateChunk();
-	bool UpdateChunkMaterial(FChunkData & InChunkData);
+	bool UpdateChunkMaterial(FChunkData& InChunkData);
 
 	/// Utility Function Right now for quickly fill the chunk with blocks
 	/// TODO: the functions inside chunk will move to world subsystem perhaps
-public:
 	UFUNCTION(BlueprintCallable)
 	bool FillChunkWithXYZ(FIntVector fillArea, FString Namespace = "Enigma", FString Path = "");
 
@@ -88,4 +86,3 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 };
-

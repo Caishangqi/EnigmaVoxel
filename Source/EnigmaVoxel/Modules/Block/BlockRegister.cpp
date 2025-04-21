@@ -12,7 +12,7 @@ bool UBlockRegister::RegisterFromDataTable(UDataTable* DataTable)
 
 bool UBlockRegister::RegisterFromDef(TSubclassOf<UDefinition> definition)
 {
-	UBlockDefinition* block = NewObject<UBlockDefinition>(this,definition);
+	UBlockDefinition* block = NewObject<UBlockDefinition>(this, definition);
 	if (block == nullptr)
 	{
 		UE_LOG(LogEnigmaVoxel, Error, TEXT("Failed to create UBlockDefinition definition -> %s"), *definition->GetName());
@@ -37,7 +37,9 @@ bool UBlockRegister::HasAlreadyRegistered(TObjectPtr<UDefinition> defInstance)
 	for (TObjectPtr<UDefinition> Definition : RegisterContext)
 	{
 		if (Definition->ID == defInstance->ID)
+		{
 			return true;
+		}
 	}
 	return false;
 }

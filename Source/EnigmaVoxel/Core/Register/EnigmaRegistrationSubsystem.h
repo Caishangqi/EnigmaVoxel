@@ -17,9 +17,8 @@ struct FResourceRegister
 {
 	GENERATED_BODY()
 
-public:
 	/// Block , Block Register
-	/// Item , Item Register
+		/// Item , Item Register
 	TMap<FString, TObjectPtr<UContentRegister>> ResourceTypeRegister;
 
 	FResourceRegister()
@@ -43,7 +42,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Context")
 	TMap<FString, FResourceRegister> RegisterMap;
 
-public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void PostInitProperties() override;
 
@@ -51,11 +49,10 @@ public:
 	static UBlockRegister* BLOCK(FString NameSpace = "Enigma");
 
 	/// Query
-public:
 	UFUNCTION(BlueprintCallable, Category = "Registration")
 	static UBlockDefinition* BLOCK_GET_VALUE(FString NameSpace = "Enigma", FString ID = "");
 
 private:
 	static UEnigmaRegistrationSubsystem* registrationSubsystem;
-	static URegistrationDelegates* EventDispatcher;
+	static URegistrationDelegates*       EventDispatcher;
 };

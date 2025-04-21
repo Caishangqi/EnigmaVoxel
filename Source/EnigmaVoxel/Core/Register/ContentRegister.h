@@ -22,14 +22,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<TObjectPtr<UDefinition>> RegisterContext;
 
-public:
 	UFUNCTION(BlueprintCallable, Category="Register")
 	virtual bool RegisterFromDataTable(UDataTable* DataTable);
 	UFUNCTION(BlueprintCallable, Category="Register")
 	virtual bool RegisterFromDef(TSubclassOf<UDefinition> definition);
 
 	/// Query	
-public:
 	virtual bool         HasAlreadyRegistered(TObjectPtr<UDefinition> defInstance);
 	virtual UDefinition* GetDefinitionByID(FString id);
 };

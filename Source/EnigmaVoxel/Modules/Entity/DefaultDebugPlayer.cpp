@@ -16,9 +16,8 @@ ADefaultDebugPlayer::ADefaultDebugPlayer()
 // Called when the game starts or when spawned
 void ADefaultDebugPlayer::BeginPlay()
 {
-	FEnigmaWorldDelegates::OnPlayerJoinWorld.Broadcast(0,Cast<AActor>(this));
+	FEnigmaWorldDelegates::OnPlayerJoinWorld.Broadcast(0, Cast<AActor>(this));
 	Super::BeginPlay();
-	
 }
 
 // Called every frame
@@ -32,4 +31,3 @@ void ADefaultDebugPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInput
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 }
-

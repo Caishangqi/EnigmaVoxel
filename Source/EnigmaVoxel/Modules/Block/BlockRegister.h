@@ -19,7 +19,6 @@ public:
 	virtual bool RegisterFromDataTable(UDataTable* DataTable) override;
 	virtual bool RegisterFromDef(TSubclassOf<UDefinition> definition) override;
 
-public:
 	virtual UDefinition* GetDefinitionByID(FString id) override;
 
 private:

@@ -8,6 +8,7 @@ public class EnigmaVoxel : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-        PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "NavigationSystem","EditorSubsystem", "AIModule", "Niagara", "EnhancedInput","GeometryFramework","MeshDescription", "GeometryCore"});
-    }
+		PublicDependencyModuleNames.AddRange(new[]
+			{ "Core", "CoreUObject", "Engine", "InputCore", "NavigationSystem", "EditorSubsystem", "AIModule", "Niagara", "EnhancedInput", "GeometryFramework", "MeshDescription", "GeometryCore" });
+	}
 }
