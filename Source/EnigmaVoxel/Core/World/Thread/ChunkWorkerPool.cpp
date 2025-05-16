@@ -1,76 +1,117 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
-
-#include "ChunkWorkerPool.h"
-
+﻿#include "ChunkWorkerPool.h"
 #include "ChunkWorker.h"
-#include "EnigmaVoxel/Core/Log/DefinedLog.h"
+#include "EnigmaVoxel/Core/World/Gen/WorldGen.hpp"
+#include "EnigmaVoxel/Modules/Chunk/ChunkHolder.h"
 
-UChunkWorkerPool::UChunkWorkerPool()
+bool UChunkWorkerPool::Init(int32 ThreadNum)
 {
-}
-
-bool UChunkWorkerPool::Init(int32 NumThreads)
-{
-	UE_LOG(LogEnigmaVoxelChunk, Warning, TEXT("UChunkWorkerPool::Init Preparing Create UChunkWorkerPool with %d workers"), NumThreads);
-	if (NumThreads <= 0)
+	if (ThreadNum <= 0)
 	{
-		NumThreads = FMath::Max(1, FPlatformMisc::NumberOfCores());
+		ThreadNum = FMath::Max(1, FPlatformMisc::NumberOfCores());
 	}
-
-	for (int32 i = 0; i < NumThreads; ++i)
+	for (int i = 0; i < ThreadNum; ++i)
 	{
-		FString          ThreadName = FString(TEXT("Chunk Worker Thread: %d"), i);
-		auto*            Worker     = new FChunkWorker(IdleCounter, i);
-		FRunnableThread* Thread     = FRunnableThread::Create(Worker, *ThreadName, 0, TPri_Normal);
-		if (!Thread)
+		FChunkWorker*    W = new FChunkWorker(*this, i);
+		FRunnableThread* T = FRunnableThread::Create(W, *FString::Printf(TEXT("ChunkWorker-%d"), i));
+		if (!T)
 		{
 			return false;
 		}
-
-		Workers.Add(Worker);
-		Threads.Add(Thread);
+		Workers.Add(W);
+		Threads.Add(T);
 	}
-	UE_LOG(LogEnigmaVoxelChunk, Warning, TEXT("UChunkWorkerPool::Init Created with %d threads and %d workers"), NumThreads, Workers.Num());
 	return true;
-}
-
-void UChunkWorkerPool::RequestExit()
-{
-	bStopping = true;
-	for (FChunkWorker* W : Workers)
-	{
-		if (W)
-		{
-			W->Stop();
-		}
-	}
 }
 
 void UChunkWorkerPool::Shutdown()
 {
-	for (int32 i = 0; i < Threads.Num(); ++i)
+	bStopping = true;
+	for (FChunkWorker* W : Workers)
 	{
-		if (Threads[i])
-		{
-			Threads[i]->WaitForCompletion(); // Halts the caller
-			delete Threads[i];
-		}
-		delete Workers[i];
+		W->Stop();
 	}
-	Threads.Empty();
+	for (FRunnableThread* T : Threads)
+	{
+		T->WaitForCompletion();
+		delete T;
+	}
 	Workers.Empty();
-	UE_LOG(LogEnigmaVoxelChunk, Warning, TEXT("UChunkWorkerPool::Shutdown Shutting down and release workers."))
+	Threads.Empty();
 }
 
-FChunkWorker* UChunkWorkerPool::GetIdleWorker()
+/* ---------- 任务发布 ---------- */
+bool UChunkWorkerPool::EnqueueBuildTask(FChunkHolder* Holder, bool bMeshOnly)
+{
+	const FIntVector Key = Holder->Coords;
+
+	FQueued* NewJob = nullptr;
+	{
+		FScopeLock _(&Mutex);
+		if (Running.Contains(Key))
+		{
+			return false; // 已有同坐标任务
+		}
+
+		TSharedPtr<TPromise<void>> Promise = MakeShared<TPromise<void>>();
+		Holder->BuildFuture                = MakeShared<TFuture<void>>(Promise->GetFuture());
+
+		NewJob          = new FQueued;
+		NewJob->Key     = Key;
+		NewJob->Promise = MakeShared<TPromise<void>>();
+		NewJob->Func    = [Promise,Holder,bMeshOnly]()
+		{
+			if (bMeshOnly)
+			{
+				FWorldGen::RebuildMesh(*Holder);
+			}
+			else
+			{
+				FWorldGen::GenerateFullChunk(*Holder);
+			}
+			Promise->SetValue();
+			Holder->Stage = EChunkStage::Ready;
+		};
+		Running.Add(Key, NewJob);
+		Pending.Enqueue(NewJob);
+	}
+	WakeAnyIdleWorker();
+	return true;
+}
+
+/* ---------- Worker 调用 ---------- */
+bool UChunkWorkerPool::DequeueJob(TUniqueFunction<void()>& Out)
+{
+	FQueued* J = nullptr;
+	{
+		FScopeLock _(&Mutex);
+		if (!Pending.Dequeue(J))
+		{
+			return false;
+		}
+		Running.Remove(J->Key);
+	}
+
+	// 让 FQueued 随 Job 生命周期一起结束
+	TUniquePtr<FQueued> Task(J);
+	Out = [Task = MoveTemp(Task)]() mutable
+	{
+		Task->Func(); // 真正工作
+		if (Task->Promise.IsValid())
+		{
+			Task->Promise->SetValue();
+		}
+	};
+	return true;
+}
+
+void UChunkWorkerPool::WakeAnyIdleWorker()
 {
 	for (FChunkWorker* W : Workers)
 	{
-		if (W && W->IsIdle())
+		if (W->IsIdle())
 		{
-			return W;
+			W->Wake();
+			break;
 		}
 	}
-	return nullptr;
 }

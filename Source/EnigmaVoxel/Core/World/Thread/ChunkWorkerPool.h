@@ -1,39 +1,42 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
-#pragma once
-
+﻿#pragma once
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
+#include "Templates/SharedPointer.h"
 #include "ChunkWorkerPool.generated.h"
 
 class FChunkWorker;
-/**
- * 
- */
+struct FChunkHolder;
+
 UCLASS()
 class ENIGMAVOXEL_API UChunkWorkerPool : public UObject
 {
 	GENERATED_BODY()
 
 public:
-	UChunkWorkerPool();
-
-	bool Init(int32 NumThreads);
-	void RequestExit();
+	bool Init(int32 ThreadNum);
 	void Shutdown();
 
-	// Returns an idle Worker; if there is no idle Worker, returns nullptr
-	FChunkWorker* GetIdleWorker();
-
-	/** Statistics interface */
-	int32 GetNumThreads() const { return Workers.Num(); }
-	int32 GetNumIdleThreads() const { return IdleCounter.GetValue(); }
+	// Task interface
+	bool EnqueueBuildTask(FChunkHolder* Holder, bool bMeshOnly); // 外部调用
+	bool DequeueJob(TUniqueFunction<void()>& Out); // 被 Worker 调
 
 private:
-	TArray<FChunkWorker*>    Workers; // One-to-one correspondence with Threads index
-	TArray<FRunnableThread*> Threads;
+	/// Internal Structure
+	struct FQueued
+	{
+		FIntVector                 Key;
+		TSharedPtr<TPromise<void>> Promise;
+		TFunction<void()>          Func;
+	};
 
-	TAtomic<bool> bStopping{false};
+	/* === 数据 === */
+	TQueue<FQueued*>           Pending;
+	FCriticalSection           Mutex;
+	TMap<FIntVector, FQueued*> Running; // 去重
+	TArray<FChunkWorker*>      Workers;
+	TArray<FRunnableThread*>   Threads;
+	FThreadSafeBool            bStopping{false};
 
-	FThreadSafeCounter IdleCounter;
+	// Helper function
+	void WakeAnyIdleWorker();
 };
