@@ -8,7 +8,7 @@
 #include "ChunkActor.generated.h"
 
 
-struct FChunkData;
+struct FChunkHolder;
 
 UCLASS()
 class ENIGMAVOXEL_API AChunkActor : public ADynamicMeshActor
@@ -68,7 +68,7 @@ public:
 	/// @return whether or not rebuild successful
 	UFUNCTION(BlueprintCallable)
 	bool UpdateChunk();
-	bool UpdateChunkMaterial(FChunkData& InChunkData);
+	bool UpdateChunkMaterial(FChunkHolder& InChunkHolder);
 
 	/// Utility Function Right now for quickly fill the chunk with blocks
 	/// TODO: the functions inside chunk will move to world subsystem perhaps

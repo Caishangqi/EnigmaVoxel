@@ -3,7 +3,7 @@
 
 #include "ChunkActor.h"
 
-#include "ChunkData.h"
+#include "ChunkHolder.h"
 #include "EnigmaVoxel/Core/Log/DefinedLog.h"
 #include "EnigmaVoxel/Core/Register/EnigmaRegistrationSubsystem.h"
 #include "EnigmaVoxel/Modules/Block/Enum/BlockDirection.h"
@@ -166,12 +166,13 @@ bool AChunkActor::UpdateChunk()
 	return false;
 }
 
-bool AChunkActor::UpdateChunkMaterial(FChunkData& InChunkData)
+bool AChunkActor::UpdateChunkMaterial(FChunkHolder& InChunkHolder)
 {
-	for (TTuple<UMaterialInterface*, int> ToSectionMap : InChunkData.MaterialToSectionMap)
+	for (auto& P : InChunkHolder.MaterialToSection)
 	{
-		DynamicMeshComponent->SetMaterial(ToSectionMap.Value, ToSectionMap.Key);
+		DynamicMeshComponent->SetMaterial(P.Value, P.Key);
 	}
+	DynamicMeshComponent->NotifyMeshUpdated();
 	return true;
 }
 
