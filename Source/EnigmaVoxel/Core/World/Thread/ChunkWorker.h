@@ -1,31 +1,25 @@
 ﻿#pragma once
+#include "HAL/Runnable.h"
+#include "Templates/Function.h"
+
+class UChunkWorkerPool;
 
 class FChunkWorker : public FRunnable
 {
 public:
-	explicit FChunkWorker(FThreadSafeCounter& InIdleCounter, int InId);
-	virtual  ~FChunkWorker() override;
+	FChunkWorker(UChunkWorkerPool& InPool, int InId);
+	virtual ~FChunkWorker() override;
 
-	void AssignJob(TFunction<void()>&& InJob);
-	bool IsIdle() const { return bIdle; }
-
+	bool           IsIdle() const { return bIdle; }
+	void           Wake();
 	virtual uint32 Run() override;
-
-	virtual void Stop() override
-	{
-		bStop = true;
-		WorkEvent->Trigger();
-	}
+	virtual void   Stop() override;
 
 private:
-	TFunction<void()> Job;
-	FCriticalSection  JobMutex;
+	UChunkWorkerPool& Pool;
+	int               Id = 0;
+	FThreadSafeBool   bStop{false};
+	FThreadSafeBool   bIdle{true};
 
-	int Id = 0;
-
-	FThreadSafeBool bIdle{true};
-	FThreadSafeBool bStop{false};
-
-	FEvent*             WorkEvent = nullptr;
-	FThreadSafeCounter& IdleCounter;
+	FEvent* WakeEvent = nullptr;
 };

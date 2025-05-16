@@ -1,53 +1,47 @@
-﻿#include "ChunkWorker.h"
-
+﻿// ChunkWorker.cpp
+#include "ChunkWorker.h"
+#include "ChunkWorkerPool.h"
 #include "EnigmaVoxel/Core/Log/DefinedLog.h"
 
-FChunkWorker::FChunkWorker(FThreadSafeCounter& InIdleCounter, int InId)
-	: Id(InId), IdleCounter(InIdleCounter)
+FChunkWorker::FChunkWorker(UChunkWorkerPool& InPool, int InId)
+	: Pool(InPool), Id(InId)
 {
-	WorkEvent = FPlatformProcess::GetSynchEventFromPool(false);
-	UE_LOG(LogEnigmaVoxelWorker, Warning, TEXT("FChunkWorker [%d] is created"), Id);
+	WakeEvent = FPlatformProcess::GetSynchEventFromPool(false);
+	UE_LOG(LogEnigmaVoxelWorker, Log, TEXT("Worker[%d] spawned"), Id);
 }
 
 FChunkWorker::~FChunkWorker()
 {
-	FPlatformProcess::ReturnSynchEventToPool(WorkEvent);
-	WorkEvent = nullptr;
-	UE_LOG(LogEnigmaVoxelWorker, Warning, TEXT("FChunkWorker [%d] was deleted"), Id);
+	FPlatformProcess::ReturnSynchEventToPool(WakeEvent);
+	UE_LOG(LogEnigmaVoxelWorker, Log, TEXT("Worker[%d] destroyed"), Id);
 }
 
-void FChunkWorker::AssignJob(TFunction<void()>&& InJob)
+void FChunkWorker::Stop()
 {
-	FScopeLock _(&JobMutex);
-	Job   = MoveTemp(InJob);
-	bIdle = false;
-	IdleCounter.Decrement();
-	WorkEvent->Trigger();
+	bStop = true;
+	WakeEvent->Trigger();
+}
+
+void FChunkWorker::Wake()
+{
+	WakeEvent->Trigger();
 }
 
 uint32 FChunkWorker::Run()
 {
 	while (!bStop)
 	{
-		WorkEvent->Wait();
-		if (bStop)
+		TUniqueFunction<void()> Job;
+		if (Pool.DequeueJob(Job))
 		{
-			break;
+			bIdle = false;
+			Job();
+			bIdle = true;
 		}
-
-		TFunction<void()> LocalJob;
+		else
 		{
-			FScopeLock _(&JobMutex);
-			LocalJob = MoveTemp(Job);
+			WakeEvent->Wait(5);
 		}
-		if (LocalJob)
-		{
-			LocalJob();
-		}
-
-		// 还原空闲状态
-		bIdle = true;
-		IdleCounter.Increment();
 	}
 	return 0;
 }
