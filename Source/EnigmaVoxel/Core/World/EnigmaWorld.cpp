@@ -2,15 +2,205 @@
 
 
 #include "EnigmaWorld.h"
-
 #include "EnigmaVoxel/Core/EVGameInstance.h"
 #include "EnigmaVoxel/Core/Log/DefinedLog.h"
-#include "EnigmaVoxel/Modules/Chunk/ChunkAsyncTask.h"
+#include "EnigmaVoxel/Modules/Chunk/ChunkHolder.h"
 #include "Thread/ChunkWorkerPool.h"
 
 UWorld* UEnigmaWorld::GetWorld() const
 {
 	return CurrentUWorld;
+}
+
+void UEnigmaWorld::GatherPlayerVisibleSet(TSet<FIntVector>& Out)
+{
+	for (FConstPlayerControllerIterator It = CurrentUWorld->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (const APlayerController* PC = It->Get())
+		{
+			const APawn* P = PC->GetPawn();
+			if (!P)
+			{
+				continue;
+			}
+
+			FIntVector Center = WorldPosToChunkCoords(P->GetActorLocation());
+			for (int dy = -ViewRadius; dy <= ViewRadius; ++dy)
+			{
+				for (int dx = -ViewRadius; dx <= ViewRadius; ++dx)
+				{
+					Out.Add(Center + FIntVector(dx, dy, 0));
+				}
+			}
+		}
+	}
+}
+
+void UEnigmaWorld::FlushDirtyAndPending(double Now)
+{
+	FScopeLock _(&ChunksMutex);
+
+	for (auto It = Chunks.CreateIterator(); It; ++It)
+	{
+		FChunkHolder* H = It.Value().Get();
+
+		/* --- bDirty -> 重构 --- */
+		if (H->Stage == EChunkStage::Ready && H->bDirty.load() && !H->bQueuedForRebuild.exchange(true))
+		{
+			ChunkWorkerPool->EnqueueBuildTask(H, true); // Mesh only
+		}
+
+		/* --- 宽限到期 -> 销毁 --- */
+		if (H->Stage == EChunkStage::PendingUnload && H->PendingUnloadUntil < Now)
+		{
+			if (AChunkActor* CA = LoadedChunks.FindRef(H->Coords))
+			{
+				CA->Destroy();
+				LoadedChunks.Remove(H->Coords);
+			}
+			It.RemoveCurrent();
+		}
+	}
+}
+
+void UEnigmaWorld::Tick()
+{
+	if (!CurrentUWorld)
+	{
+		return;
+	}
+	const double Now = FPlatformTime::Seconds();
+
+	/* 1) 收集本帧视野 */
+	TSet<FIntVector> Desired;
+	GatherPlayerVisibleSet(Desired);
+
+	/* 2) 加/减票据 -> 提交任务/卸载 */
+	ProcessTickets(Desired, Now);
+
+	/* 3) 线程池结果 → 生成或更新 Actor */
+	PumpWorkerResults();
+
+	/* 4) 处理 bDirty 重构 & 真正销毁 PendingUnload 到期的区块 */
+	FlushDirtyAndPending(Now);
+
+	/* 5) 保存集合供下帧差集 */
+	PrevVisibleSet = MoveTemp(Desired);
+}
+
+TSet<FIntVector> UEnigmaWorld::GatherPlayerView(int radius)
+{
+	TSet<FIntVector> Desired;
+
+	if (radius < 0) // 容错
+	{
+		return Desired;
+	}
+
+	for (APawn* Pawn : Players)
+	{
+		if (!Pawn)
+		{
+			continue;
+		}
+
+		const FVector    PawnLocation = Pawn->GetActorLocation();
+		const FIntVector CenterCoords = WorldPosToChunkCoords(PawnLocation);
+
+		for (int32 dx = -radius; dx <= radius; ++dx)
+		{
+			for (int32 dy = -radius; dy <= radius; ++dy)
+			{
+				FIntVector C(CenterCoords.X + dx, CenterCoords.Y + dy, 0);
+				Desired.Add(C);
+			}
+		}
+	}
+	return Desired;
+}
+
+void UEnigmaWorld::ProcessTickets(const TSet<FIntVector>& Desired, double Now)
+{
+	TSet<FIntVector> ToLoad   = Desired.Difference(PrevVisibleSet);
+	TSet<FIntVector> ToUnload = PrevVisibleSet.Difference(Desired);
+
+	FScopeLock _(&ChunksMutex);
+
+	/* ---- 加票 & 可能排任务 ---- */
+	for (const FIntVector& C : ToLoad)
+	{
+		FChunkHolder* H = nullptr;
+		if (TUniquePtr<FChunkHolder>* Ptr = Chunks.Find(C))
+		{
+			H = Ptr->Get();
+		}
+		else
+		{
+			H = Chunks.Add(C, MakeUnique<FChunkHolder>()).Get();
+		}
+
+		H->Coords = C;
+		H->AddTicket();
+
+		if (H->Stage == EChunkStage::Unloaded)
+		{
+			H->Stage = EChunkStage::Loading;
+			ChunkWorkerPool->EnqueueBuildTask(H, false); // 生成块+网格
+		}
+	}
+
+	/* ---- 减票 (离开视野一次) ---- */
+	for (const FIntVector& C : ToUnload)
+	{
+		if (TUniquePtr<FChunkHolder>* Ptr = Chunks.Find(C))
+		{
+			(*Ptr)->RemoveTicket(Now, GracePeriod);
+		}
+	}
+}
+
+
+void UEnigmaWorld::PumpWorkerResults()
+{
+	FScopeLock _(&ChunksMutex);
+
+	for (auto& KV : Chunks)
+	{
+		FChunkHolder* H = KV.Value.Get();
+
+		/*if (H->Stage == EChunkStage::Loading && H->BuildFuture.IsValid() && H->BuildFuture->IsReady())
+		{
+			H->Stage = EChunkStage::Ready;
+		}*/
+
+		if (H->Stage != EChunkStage::Ready || LoadedChunks.Contains(KV.Key))
+		{
+			continue;
+		}
+
+		/* —— 在 GameThread 创建/更新 Actor —— */
+		AsyncTask(ENamedThreads::GameThread, [this,Coords = KV.Key, H]()
+		{
+			AChunkActor* CA = nullptr;
+			if (TObjectPtr<AChunkActor>* Found = LoadedChunks.Find(Coords))
+			{
+				CA = *Found;
+			}
+			else
+			{
+				FActorSpawnParameters P;
+				P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				FVector Origin(Coords.X * 1600.f, Coords.Y * 1600.f, 0.f); // TODO: 坐标换算
+				CA = CurrentUWorld->SpawnActor<AChunkActor>(AChunkActor::StaticClass(), Origin, FRotator::ZeroRotator, P);
+				LoadedChunks.Add(Coords, CA);
+			}
+			UDynamicMesh*  DynMesh = CA->GetDynamicMeshComponent()->GetDynamicMesh();
+			FDynamicMesh3& MeshRef = DynMesh->GetMeshRef();
+			MeshRef                = MoveTemp(H->Mesh);
+			CA->UpdateChunkMaterial(*H);
+			NotifyNeighborsChunkLoaded(Coords);
+		});
+	}
 }
 
 bool UEnigmaWorld::SetUWorldTarget(UWorld* UnrealBuildInWorld)
@@ -44,19 +234,21 @@ bool UEnigmaWorld::GetEnableWorldTick()
 /// @param ChunkCoords 
 void UEnigmaWorld::NotifyNeighborsChunkLoaded(FIntVector ChunkCoords)
 {
-	static const TArray<FIntVector> Directions = {
-		FIntVector(1, 0, 0), FIntVector(-1, 0, 0),
-		FIntVector(0, 1, 0), FIntVector(0, -1, 0)
+	static const FIntVector Offsets[6] = {
+		{1, 0, 0}, {-1, 0, 0},
+		{0, 1, 0}, {0, -1, 0},
+		{0, 0, 1}, {0, 0, -1}
 	};
-	for (const FIntVector& Dir : Directions)
+
+	for (const FIntVector& O : Offsets)
 	{
-		FIntVector neighborCoords = ChunkCoords + Dir;
-		if (FChunkInfo* NeighborInfoPtr = ChunkMap.Find(neighborCoords))
+		if (TUniquePtr<FChunkHolder>* Ptr = Chunks.Find(ChunkCoords + O))
 		{
-			// If the neighbor is in the LOADED state, mark it as dirty
-			if (NeighborInfoPtr->LoadState == EChunkLoadState::LOADED)
+			FChunkHolder* N = Ptr->Get();
+			if (N->Stage == EChunkStage::Ready)
 			{
-				NeighborInfoPtr->bIsDirty = true;
+				N->bDirty            = true;
+				N->bQueuedForRebuild = false; // 允许重新排 MeshOnly
 			}
 		}
 	}
@@ -71,7 +263,6 @@ void UEnigmaWorld::BeginDestroy()
 {
 	if (ChunkWorkerPool)
 	{
-		ChunkWorkerPool->RequestExit(); // 标记 + Trigger
 		ChunkWorkerPool->Shutdown(); // 等待全部线程安全退出
 	}
 	Super::BeginDestroy();
@@ -85,302 +276,8 @@ void UEnigmaWorld::UpdateStreamingChunks()
 		UE_LOG(LogEnigmaVoxelWorld, Warning, TEXT("UEnigmaWorld::UpdateStreamingChunks() - CurrentUWorld is null"))
 		return;
 	}
-
-	TSet<FIntVector> DesiredChunkCoords;
-	constexpr int32  LoadRadius = 3;
-	for (APawn* Pawn : Players)
-	{
-		if (!Pawn)
-		{
-			continue;
-		}
-
-		FVector    PawnLocation      = Pawn->GetActorLocation();
-		FIntVector CenterChunkCoords = WorldPosToChunkCoords(PawnLocation);
-
-		for (int32 dx = -LoadRadius; dx <= LoadRadius; ++dx)
-		{
-			for (int32 dy = -LoadRadius; dy <= LoadRadius; ++dy)
-			{
-				FIntVector NewCoords(
-					CenterChunkCoords.X + dx,
-					CenterChunkCoords.Y + dy,
-					CenterChunkCoords.Z
-				);
-				DesiredChunkCoords.Add(NewCoords);
-			}
-		}
-	}
-
-	TSet<FIntVector> ExistingChunks;
-	LoadedChunks.GetKeys(ExistingChunks);
-
-	TSet<FIntVector> ToLoad   = DesiredChunkCoords.Difference(ExistingChunks);
-	TSet<FIntVector> ToUnload = ExistingChunks.Difference(DesiredChunkCoords);
-
-
-	/*FAsyncTask<FChunkAsyncTask>* chunkTask = new FAsyncTask<FChunkAsyncTask>(this, Load);
-	chunkTask->StartBackgroundTask(ChunkWorkerThreadPool.Get());*/
-
-	/// We constantly check the dirty chunk, if we found the dirty chunk we
-	/// rebuild their data based on its current blockdata and neibourhood state
-
-	/*TMap<FIntVector, FChunkInfo> TempMap = CopyTemp(ChunkMap);
-	for (int i = 0; i < TempMap.Num(); ++i)
-	{
-		TArray<FIntVector> ChunkCoords;
-		TempMap.GetKeys(ChunkCoords);
-		UpdateChunkAsync(ChunkCoords[i]);
-	}*/
-
-	/*TSet<FIntVector> ToLoadTemp = CopyTemp(ToLoad);
-	for (const FIntVector& ChunkCoords : ToLoadTemp)
-	{
-		BeginLoadChunkAsync(ChunkCoords);
-	}
-
-	// TODO: Consider implement UnloadChunkAsync() if needed
-	for (const FIntVector& ChunkCoords : ToUnload)
-	{
-		UnloadChunk(ChunkCoords);
-	}*/
-}
-
-AChunkActor* UEnigmaWorld::LoadChunk(const FIntVector& ChunkCoords)
-{
-	if (!CurrentUWorld)
-	{
-		return nullptr;
-	}
-
-	if (LoadedChunks.Contains(ChunkCoords))
-	{
-		return LoadedChunks[ChunkCoords];
-	}
-
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	FVector      ChunkOrigin(static_cast<float>(ChunkCoords.X) * 1600.f, static_cast<float>(ChunkCoords.Y) * 1600.f, static_cast<float>(ChunkCoords.Z) * 1600.f);
-	AChunkActor* NewChunkActor = CurrentUWorld->SpawnActor<AChunkActor>(AChunkActor::StaticClass(), ChunkOrigin, FRotator::ZeroRotator, SpawnParams);
-	if (NewChunkActor)
-	{
-		LoadedChunks.Add(ChunkCoords, NewChunkActor);
-		NewChunkActor->FillChunkWithXYZ(FIntVector(16, 16, 8), TEXT("Enigma"), TEXT("Blue Enigma Block"));
-		NewChunkActor->UpdateChunk();
-	}
-
-	return NewChunkActor;
-}
-
-bool UEnigmaWorld::UnloadChunk(const FIntVector& ChunkCoords)
-{
-	if (!ChunkMap.Contains(ChunkCoords))
-	{
-		return false;
-	}
-
-	// If the Actor already exists, Destroy it
-	if (AChunkActor* FoundActor = LoadedChunks.FindRef(ChunkCoords))
-	{
-		FoundActor->Destroy();
-		LoadedChunks.Remove(ChunkCoords);
-	}
-
-	// Remove ChunkMap
-	ChunkMap.Remove(ChunkCoords);
-	UE_LOG(LogEnigmaVoxelChunk, Display, TEXT("Unloaded Chunk at ChunkPos= [ %s ]"), *ChunkCoords.ToString())
-	return true;
-}
-
-void UEnigmaWorld::RebuildChunkMeshData(FChunkInfo& InOutChunkInfo)
-{
-	FChunkData& ChunkData = InOutChunkInfo.ChunkData;
-	ChunkData.RefreshMaterialData();
-	FDynamicMesh3 TempMesh;
-
-	UE_LOG(LogEnigmaVoxelChunk, Warning, TEXT("Rebuild Chunk at ChunkPos= [ %s ]"), *ChunkData.ChunkCoords.ToString())
-
-	for (int z = 0; z < ChunkData.ChunkDimension.Z; ++z)
-	{
-		for (int y = 0; y < ChunkData.ChunkDimension.Y; ++y)
-		{
-			for (int x = 0; x < ChunkData.ChunkDimension.X; ++x)
-			{
-				const FBlock& Block = ChunkData.GetBlock(FIntVector(x, y, z));
-				if (!Block.Definition)
-				{
-					continue;
-				}
-				AppendBoxForBlock(this, TempMesh, Block, ChunkData);
-			}
-		}
-	}
-	ChunkData.BuiltMeshData.Mesh = TempMesh;
-	ChunkData.bHasBuiltMesh      = true;
-	UE_LOG(LogEnigmaVoxelChunk, Display, TEXT("FChunkData Mesh at [ %s ] Mesh Build successful"), *ChunkData.ChunkCoords.ToString())
-}
-
-void UEnigmaWorld::GenerateChunkDataAsync(FChunkData& InOutChunkData)
-{
-	// Fill the block data ( This is a simple example) this method will finally integrate
-	// with perlin noise
-	InOutChunkData.FillChunkWithArea(FIntVector(16, 16, 8), "Enigma", "Blue Enigma Block");
-
-	FDynamicMesh3 TempMesh;
-
-	/// TODO: Consider move the Material Section Cache here that maintain ChunkData as pure data
-	/// TODO: Fix the concurrent issue that make the Material section chaose.
-	for (int z = 0; z < InOutChunkData.ChunkDimension.Z; ++z)
-	{
-		for (int y = 0; y < InOutChunkData.ChunkDimension.Y; ++y)
-		{
-			for (int x = 0; x < InOutChunkData.ChunkDimension.X; ++x)
-			{
-				const FBlock& Block = InOutChunkData.GetBlock(FIntVector(x, y, z));
-				if (!Block.Definition)
-				{
-					continue;
-				}
-				// Append the visible surface of the block to TempMesh
-				// UNLOADED, but culling after other LOADED
-				AppendBoxForBlock(TempMesh, Block, InOutChunkData);
-			}
-		}
-	}
-	InOutChunkData.BuiltMeshData.Mesh = TempMesh;
-	InOutChunkData.bHasBuiltMesh      = true;
-	UE_LOG(LogEnigmaVoxelChunk, Display, TEXT("FChunkData Mesh at [ %s ] Mesh Build successful"), *InOutChunkData.ChunkCoords.ToString())
-}
-
-void UEnigmaWorld::BeginLoadChunkAsync(const FIntVector& ChunkCoords)
-{
-	// Generate asynchronously in background thread
-	Async(EAsyncExecution::ThreadPool, [this, ChunkCoords]()
-	      {
-		      ChunkMapMutex.Lock();
-		      if (!ChunkMap.Contains(ChunkCoords))
-		      {
-			      FChunkInfo NewInfo;
-			      NewInfo.ChunkData.ChunkCoords    = ChunkCoords;
-			      NewInfo.ChunkData.ChunkDimension = FIntVector(16, 16, 16);
-			      NewInfo.ChunkData.BlockSize      = 100.f;
-			      NewInfo.LoadState                = EChunkLoadState::LOADING;
-			      ChunkMap.Add(ChunkCoords, NewInfo);
-			      UE_LOG(LogEnigmaVoxelChunk, Display, TEXT("FChunkData Construct: ChunkPos= [ %s ], NumBlocks= [ %d ]"), *ChunkCoords.ToString(), NewInfo.ChunkData.Blocks.Num())
-		      }
-		      else
-		      {
-			      FChunkInfo& Info = ChunkMap[ChunkCoords];
-			      if (Info.LoadState == EChunkLoadState::LOADING)
-			      {
-				      ChunkMapMutex.Unlock();
-				      return;
-			      }
-			      if (Info.LoadState != EChunkLoadState::UNLOADED)
-			      {
-				      // If it is already loading or has been loaded, do not repeat the request
-				      ChunkMapMutex.Unlock();
-				      return;
-			      }
-			      Info.LoadState = EChunkLoadState::LOADING;
-		      }
-		      // Background thread needs to read or write ChunkMap[ChunkCoords].ChunkData => need lock
-
-		      if (!ChunkMap.Contains(ChunkCoords))
-		      {
-			      return;
-		      }
-		      GenerateChunkDataAsync(ChunkMap[ChunkCoords].ChunkData); // We calculate the Chunk Mesh
-		      ChunkMapMutex.Unlock();
-	      },
-	      [this, ChunkCoords]() // After background thread complete we need the data to spawn actual Chunk Actor
-	      {
-		      AsyncTask(ENamedThreads::GameThread, [this, ChunkCoords]()
-		      {
-			      // Chunk may have been unloaded while executing in the background => Check
-			      if (!ChunkMap.Contains(ChunkCoords))
-			      {
-				      return;
-			      }
-
-			      FChunkInfo& Info = ChunkMap[ChunkCoords];
-			      if (Info.LoadState != EChunkLoadState::LOADING)
-			      {
-				      return; // May be marked as UNLOADED during background operation
-			      }
-			      Info.LoadState = EChunkLoadState::LOADED;
-			      /// Prepare spawn Chunk Actor
-			      FActorSpawnParameters SpawnParams;
-			      SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-			      FVector      ChunkOrigin(static_cast<float>(ChunkCoords.X) * 1600.f, static_cast<float>(ChunkCoords.Y) * 1600.f, 0.f);
-			      AChunkActor* NewChunkActor = CurrentUWorld->SpawnActor<AChunkActor>(AChunkActor::StaticClass(), ChunkOrigin, FRotator::ZeroRotator, SpawnParams);
-
-			      if (!NewChunkActor)
-			      {
-				      return;
-			      }
-			      ///
-
-			      // Assign the Mesh generated by the background thread to AChunkActor->DynamicMeshComponent
-
-			      UDynamicMesh*  DynMesh = NewChunkActor->GetDynamicMeshComponent()->GetDynamicMesh();
-			      FDynamicMesh3& MeshRef = DynMesh->GetMeshRef();
-
-			      // Move the background data to this MeshRef
-			      // MoveTemp can avoid copying, but make sure you don't use Info.ChunkData.BuiltMeshData.Mesh again
-			      MeshRef = CopyTemp(Info.ChunkData.BuiltMeshData.Mesh);
-			      NewChunkActor->UpdateChunkMaterial(Info.ChunkData);
-			      NewChunkActor->GetDynamicMeshComponent()->NotifyMeshUpdated();
-			      // NewChunkActor->GetDynamicMeshComponent()->UpdateCollision();
-
-			      // Update LoadedChunksMap (or LoadedChunks) to manage
-			      LoadedChunks.Add(ChunkCoords, NewChunkActor);
-			      NotifyNeighborsChunkLoaded(ChunkCoords);
-			      UE_LOG(LogEnigmaVoxelChunk, Display, TEXT("Loaded Chunk at ChunkPos= [ %s ]"), *ChunkCoords.ToString())
-		      });
-	      });
-}
-
-void UEnigmaWorld::UpdateChunkAsync(const FIntVector& ChunkCoords)
-{
-	FChunkInfo Info = ChunkMap[ChunkCoords];
-	if (Info.bIsDirty && Info.LoadState == EChunkLoadState::LOADED)
-	{
-		Async(EAsyncExecution::ThreadPool,
-		      [this, ChunkCoords]()
-		      {
-			      ChunkMapMutex.Lock();
-			      if (!ChunkMap.Contains(ChunkCoords))
-			      {
-				      return;
-			      }
-			      FChunkInfo& InfoRef = ChunkMap[ChunkCoords];
-			      InfoRef.bIsDirty    = false;
-			      RebuildChunkMeshData(InfoRef);
-			      ChunkMapMutex.Unlock();
-		      },
-		      [this, ChunkCoords]() // Update the chunk mesh data in the main thread
-		      {
-			      AsyncTask(ENamedThreads::GameThread, [this, ChunkCoords]()
-			      {
-				      if (!ChunkMap.Contains(ChunkCoords))
-				      {
-					      return;
-				      }
-				      FChunkInfo& InfoRef = ChunkMap[ChunkCoords];
-				      if (!LoadedChunks.Contains(ChunkCoords))
-				      {
-					      return;
-				      }
-				      AChunkActor*   chunk   = LoadedChunks[ChunkCoords];
-				      UDynamicMesh*  DynMesh = chunk->GetDynamicMeshComponent()->GetDynamicMesh();
-				      FDynamicMesh3& MeshRef = DynMesh->GetMeshRef();
-				      MeshRef                = InfoRef.ChunkData.BuiltMeshData.Mesh;
-				      chunk->UpdateChunkMaterial(InfoRef.ChunkData);
-				      chunk->GetDynamicMeshComponent()->NotifyMeshUpdated();
-			      });
-		      });
-	}
+	const double Now = FPlatformTime::Seconds();
+	Tick();
 }
 
 bool UEnigmaWorld::AddEntity(APawn* InEntity)
@@ -413,7 +310,6 @@ void UEnigmaWorld::ShutdownChunkWorkerPool()
 {
 	if (ChunkWorkerPool)
 	{
-		ChunkWorkerPool->RequestExit(); // 让线程自退
 		ChunkWorkerPool->Shutdown(); // Join
 	}
 }
@@ -463,12 +359,12 @@ UBlockDefinition* UEnigmaWorld::GetBlockAtWorldPos(const FVector& WorldPos)
 	FIntVector chunkCoords = WorldPosToChunkCoords(WorldPos);
 
 	// 如果不存在或尚未加载
-	if (!ChunkMap.Contains(chunkCoords))
+	if (!Chunks.Contains(chunkCoords))
 	{
 		return nullptr; // 表示此处是“空气”或区块不存在
 	}
-	FChunkInfo& info = ChunkMap[chunkCoords];
-	if (info.LoadState != EChunkLoadState::LOADED)
+	FChunkHolder* holder = Chunks[chunkCoords].Get();
+	if (holder->Stage != EChunkStage::Ready)
 	{
 		return nullptr; // 区块还没加载完，也当成空气处理
 	}
@@ -476,15 +372,15 @@ UBlockDefinition* UEnigmaWorld::GetBlockAtWorldPos(const FVector& WorldPos)
 	// 获取在这个区块内的局部坐标
 	FIntVector localCoords = WorldPosToChunkLocalCoords(WorldPos);
 	// 这里最好先检查 localCoords 是否都在 [0..15]
-	if (localCoords.X < 0 || localCoords.X >= info.ChunkData.ChunkDimension.X ||
-		localCoords.Y < 0 || localCoords.Y >= info.ChunkData.ChunkDimension.Y ||
-		localCoords.Z < 0 || localCoords.Z >= info.ChunkData.ChunkDimension.Z)
+	if (localCoords.X < 0 || localCoords.X >= holder->Dimension.X ||
+		localCoords.Y < 0 || localCoords.Y >= holder->Dimension.Y ||
+		localCoords.Z < 0 || localCoords.Z >= holder->Dimension.Z)
 	{
 		return nullptr;
 	}
 
 	// 获取此处的方块
-	const FBlock& blockData = info.ChunkData.GetBlock(localCoords);
+	const FBlock& blockData = holder->GetBlock(localCoords);
 	if (!blockData.Definition)
 	{
 		return nullptr;

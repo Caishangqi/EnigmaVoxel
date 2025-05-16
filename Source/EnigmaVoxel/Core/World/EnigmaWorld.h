@@ -3,11 +3,11 @@
 #include "CoreMinimal.h"
 #include "Containers/Deque.h"
 #include "EnigmaVoxel/Modules/Chunk/ChunkActor.h"
-#include "EnigmaVoxel/Modules/Chunk/ChunkAsyncTask.h"
-#include "EnigmaVoxel/Modules/Chunk/ChunkData.h"
 #include "UObject/Object.h"
 #include "EnigmaWorld.generated.h"
 
+enum class ETicketType : uint8;
+struct FChunkHolder;
 class UChunkWorkerPool;
 /**
  * UEnigmaWorld 当成“逻辑和数据管理器”，在内部维护 Chunk 的数据结构，然后在需要显示或碰撞时，委托 UWorld 生成真正的 Actor。
@@ -25,17 +25,25 @@ public:
 	UEnigmaWorld();
 	virtual void BeginDestroy() override;
 
-	virtual UWorld* GetWorld() const override;
+	virtual UWorld*                            GetWorld() const override;
+	TSet<FIntVector>                           PrevVisibleSet;
+	TMap<FIntVector, TUniquePtr<FChunkHolder>> Chunks;
+	FCriticalSection                           ChunksMutex;
+
+	void             GatherPlayerVisibleSet(TSet<FIntVector>& Out);
+	void             FlushDirtyAndPending(double Now);
+	void             Tick();
+	TSet<FIntVector> GatherPlayerView(int radius = 3);
+	void             ProcessTickets(const TSet<FIntVector>& Desired, double Now);
+	void             PumpWorkerResults();
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Chunk")
 	TMap<FIntVector, TObjectPtr<AChunkActor>> LoadedChunks;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Chunk")
 	TArray<TObjectPtr<APawn>> Players;
-	// Store [Chunk coordinates => Chunk information]
-	// Chunk information can record chunk status (UNLOADED, LOADING, LOADED), FDynamicMesh3 generated in the thread pool, etc.
-	TMap<FIntVector, FChunkInfo> ChunkMap;
 
-	mutable FCriticalSection ChunkMapMutex;
+	static constexpr int32  ViewRadius  = 3; // 玩家视野半径(区块)
+	static constexpr double GracePeriod = 1.0; // 卸载宽限
 
 	UFUNCTION(BlueprintCallable, Category="World")
 	bool SetUWorldTarget(UWorld* UnrealBuildInWorld);
@@ -62,20 +70,8 @@ public:
 	void NotifyNeighborsChunkLoaded(FIntVector ChunkCoords);
 
 	/// Chunk Streaming
-
 	UFUNCTION(BlueprintCallable, Category="World")
 	void UpdateStreamingChunks();
-	DEPRECATED_MACRO(1.2, "The Method is deprecated, please use BeginLoadChunkAsync() instead")
-	AChunkActor* LoadChunk(const FIntVector& ChunkCoords);
-	bool         UnloadChunk(const FIntVector& ChunkCoords);
-
-	// Async
-	void RebuildChunkMeshData(FChunkInfo& InOutChunkInfo);
-	void GenerateChunkDataAsync(FChunkData& InOutChunkData);
-	void BeginLoadChunkAsync(const FIntVector& ChunkCoords);
-	void UpdateChunkAsync(const FIntVector& ChunkCoords);
-	///
-
 	/// Entity Management
 	UFUNCTION(BlueprintCallable, Category="Entity Management")
 	bool AddEntity(APawn* InEntity);
@@ -98,5 +94,4 @@ private:
 	/// Thread Pool and Workers
 	UPROPERTY()
 	TObjectPtr<UChunkWorkerPool> ChunkWorkerPool = nullptr;
-	TQueue<FIntVector>           PendingChunks;
 };
