@@ -48,7 +48,7 @@ void UEnigmaWorldSubsystem::UpdateWorldTick()
 		UEnigmaWorld* World = KV.Value;
 		if (World && World->GetEnableWorldTick())
 		{
-			World->UpdateStreamingChunks();
+			World->Tick();
 		}
 	}
 }
