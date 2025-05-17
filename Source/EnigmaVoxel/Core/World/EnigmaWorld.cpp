@@ -44,10 +44,10 @@ void UEnigmaWorld::FlushDirtyAndPending(double Now)
 	{
 		FChunkHolder* H = It.Value().Get();
 
-		// Dirty, need rebuild.
-		if (H->Stage == EChunkStage::Ready && H->bDirty.load() && !H->bQueuedForRebuild.exchange(true))
+		if (H->bDirty && !H->bQueuedForRebuild.exchange(true))
 		{
-			ChunkWorkerPool->EnqueueBuildTask(H, true, this); // Mesh only
+			H->bDirty = false;
+			ChunkWorkerPool->EnqueueBuildTask(H, /*bMeshOnly=*/true, this);
 		}
 
 		// Exceed Grace period, destroy.
@@ -86,37 +86,6 @@ void UEnigmaWorld::Tick()
 
 	// Save the collection for next tick difference
 	PrevVisibleSet = MoveTemp(Desired);
-}
-
-TSet<FIntVector> UEnigmaWorld::GatherPlayerView(int radius)
-{
-	TSet<FIntVector> Desired;
-
-	if (radius < 0) // 容错
-	{
-		return Desired;
-	}
-
-	for (APawn* Pawn : Players)
-	{
-		if (!Pawn)
-		{
-			continue;
-		}
-
-		const FVector    PawnLocation = Pawn->GetActorLocation();
-		const FIntVector CenterCoords = WorldPosToChunkCoords(PawnLocation);
-
-		for (int32 dx = -radius; dx <= radius; ++dx)
-		{
-			for (int32 dy = -radius; dy <= radius; ++dy)
-			{
-				FIntVector C(CenterCoords.X + dx, CenterCoords.Y + dy, 0);
-				Desired.Add(C);
-			}
-		}
-	}
-	return Desired;
 }
 
 void UEnigmaWorld::ProcessTickets(const TSet<FIntVector>& Desired, double Now)
@@ -167,28 +136,33 @@ void UEnigmaWorld::PumpWorkerResults()
 	{
 		FChunkHolder* H = KV.Value.Get();
 		if (H->Stage != EChunkStage::Ready)
+		{
 			continue;
+		}
 
-		AsyncTask(ENamedThreads::GameThread,
-		          [this, Coords = KV.Key, H]()
-		          {
-			          AChunkActor* CA = LoadedChunks.FindRef(Coords);
-			          if (!CA)
-			          {
-				          // This is the first time loading, and Spawn is required
-				          FActorSpawnParameters P;
-				          P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-				          FVector Origin((float)Coords.X * 1600.f, (float)Coords.Y * 1600.f, 0.f);
-				          CA = CurrentUWorld->SpawnActor<AChunkActor>(
-					          AChunkActor::StaticClass(), Origin, FRotator::ZeroRotator, P);
-				          LoadedChunks.Add(Coords, CA);
-			          }
+		AsyncTask(ENamedThreads::GameThread, [this, Coords = KV.Key, H]()
+		{
+			AChunkActor* CA = LoadedChunks.FindRef(Coords);
+			if (!CA)
+			{
+				FActorSpawnParameters P;
+				P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				FVector Origin(Coords.X * 1600.f, Coords.Y * 1600.f, 0.f); // TODO: Parameterize the statement
+				CA = CurrentUWorld->SpawnActor<AChunkActor>(
+					AChunkActor::StaticClass(), Origin, FRotator::ZeroRotator, P);
+				LoadedChunks.Add(Coords, CA);
+			}
 
-			          // Regardless of whether it is new or old, copy the "latest" grid in
-			          UDynamicMesh* DynMesh = CA->GetDynamicMeshComponent()->GetDynamicMesh();
-			          DynMesh->GetMeshRef() = H->Mesh;
-			          CA->UpdateChunkMaterial(*H);
-		          });
+			UDynamicMesh* DynMesh = CA->GetDynamicMeshComponent()->GetDynamicMesh();
+			DynMesh->GetMeshRef() = CopyTemp(H->Mesh);
+			CA->UpdateChunkMaterial(*H);
+
+			H->Stage = EChunkStage::Loaded;
+			if (H->bNeedsNeighborNotify.exchange(false, std::memory_order_relaxed))
+			{
+				NotifyNeighborsChunkLoaded(Coords);
+			}
+		});
 	}
 }
 
@@ -234,10 +208,10 @@ void UEnigmaWorld::NotifyNeighborsChunkLoaded(FIntVector ChunkCoords)
 		if (TUniquePtr<FChunkHolder>* Ptr = Chunks.Find(ChunkCoords + O))
 		{
 			FChunkHolder* N = Ptr->Get();
-			if (N->Stage == EChunkStage::Ready)
+			if (N->Stage == EChunkStage::Loaded || N->Stage == EChunkStage::Ready)
 			{
 				N->bDirty            = true;
-				N->bQueuedForRebuild = false; // Allow reordering of MeshOnly
+				N->bQueuedForRebuild = false;
 			}
 		}
 	}
@@ -257,17 +231,6 @@ void UEnigmaWorld::BeginDestroy()
 	Super::BeginDestroy();
 }
 
-
-void UEnigmaWorld::UpdateStreamingChunks()
-{
-	if (!CurrentUWorld)
-	{
-		UE_LOG(LogEnigmaVoxelWorld, Warning, TEXT("UEnigmaWorld::UpdateStreamingChunks() - CurrentUWorld is null"))
-		return;
-	}
-	const double Now = FPlatformTime::Seconds();
-	Tick();
-}
 
 bool UEnigmaWorld::AddEntity(APawn* InEntity)
 {
@@ -353,7 +316,7 @@ UBlockDefinition* UEnigmaWorld::GetBlockAtWorldPos(const FVector& WorldPos)
 		return nullptr; // Indicates that this is "air" or the block does not exist
 	}
 	FChunkHolder* holder = Chunks[chunkCoords].Get();
-	if (holder->Stage != EChunkStage::Ready)
+	if (holder->Stage != EChunkStage::Ready && holder->Stage != EChunkStage::Loaded)
 	{
 		return nullptr; // The block has not been loaded yet, so it is treated as air.
 	}
@@ -379,6 +342,6 @@ UBlockDefinition* UEnigmaWorld::GetBlockAtWorldPos(const FVector& WorldPos)
 
 UBlockDefinition* UEnigmaWorld::GetBlockAtBlockPos(const FIntVector& BlockPos)
 {
-	//FScopeLock _(&ChunksMutex);
+	FScopeLock _(&ChunksMutex);
 	return GetBlockAtWorldPos(FVector(static_cast<float>(BlockPos.X) * BlockWorldSize, static_cast<float>(BlockPos.Y) * BlockWorldSize, static_cast<float>(BlockPos.Z) * BlockWorldSize));
 }

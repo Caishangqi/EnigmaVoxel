@@ -25,25 +25,20 @@ public:
 	UEnigmaWorld();
 	virtual void BeginDestroy() override;
 
-	virtual UWorld*                            GetWorld() const override;
-	TSet<FIntVector>                           PrevVisibleSet;
-	TMap<FIntVector, TUniquePtr<FChunkHolder>> Chunks;
-	FCriticalSection                           ChunksMutex;
+	virtual UWorld* GetWorld() const override;
 
-	void             GatherPlayerVisibleSet(TSet<FIntVector>& Out);
-	void             FlushDirtyAndPending(double Now);
-	void             Tick();
-	TSet<FIntVector> GatherPlayerView(int radius = 3);
-	void             ProcessTickets(const TSet<FIntVector>& Desired, double Now);
-	void             PumpWorkerResults();
+	/// Life Hool Functions
+	void Tick();
+	void GatherPlayerVisibleSet(TSet<FIntVector>& Out);
+	void ProcessTickets(const TSet<FIntVector>& Desired, double Now);
+	void PumpWorkerResults();
+	void FlushDirtyAndPending(double Now);
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Chunk")
 	TMap<FIntVector, TObjectPtr<AChunkActor>> LoadedChunks;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Chunk")
 	TArray<TObjectPtr<APawn>> Players;
 
-	static constexpr int32  ViewRadius  = 3; // Player's field of view radius (blocks)
-	static constexpr double GracePeriod = 10; // Uninstall grace period
 
 	UFUNCTION(BlueprintCallable, Category="World")
 	bool SetUWorldTarget(UWorld* UnrealBuildInWorld);
@@ -68,30 +63,31 @@ public:
 
 	/// Notify
 	void NotifyNeighborsChunkLoaded(FIntVector ChunkCoords);
-
-	/// Chunk Streaming
-	UFUNCTION(BlueprintCallable, Category="World")
-	void UpdateStreamingChunks();
 	/// Entity Management
 	UFUNCTION(BlueprintCallable, Category="Entity Management")
 	bool AddEntity(APawn* InEntity);
 	UFUNCTION(BlueprintCallable, Category="Entity Management")
 	bool RemoveEntity(APawn* InEntity);
-
-	/// 
-
-	/// Thread Management
+	/// Thread Pool Management
 	void InitializeChunkWorkerPool();
 	void ShutdownChunkWorkerPool();
 
 protected:
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category="World")
+	/// Properties
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category="World Properties")
 	TObjectPtr<UWorld> CurrentUWorld = nullptr;
-
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="World Properties")
 	bool EnableWorldTick = true;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="World Properties")
+	int32 ViewRadius = 3; // Player's field of view radius (blocks)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="World Properties")
+	double GracePeriod = 10; // Uninstall grace period
 
 private:
 	/// Thread Pool and Workers
 	UPROPERTY()
-	TObjectPtr<UChunkWorkerPool> ChunkWorkerPool = nullptr;
+	TObjectPtr<UChunkWorkerPool>               ChunkWorkerPool = nullptr;
+	TSet<FIntVector>                           PrevVisibleSet;
+	TMap<FIntVector, TUniquePtr<FChunkHolder>> Chunks;
+	FCriticalSection                           ChunksMutex;
 };
