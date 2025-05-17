@@ -39,7 +39,7 @@ void UChunkWorkerPool::Shutdown()
 	Threads.Empty();
 }
 
-/* ---------- 任务发布 ---------- */
+// Task Release
 bool UChunkWorkerPool::EnqueueBuildTask(FChunkHolder* Holder, bool bMeshOnly, UEnigmaWorld* World)
 {
 	const FIntVector Key = Holder->Coords;
@@ -49,7 +49,7 @@ bool UChunkWorkerPool::EnqueueBuildTask(FChunkHolder* Holder, bool bMeshOnly, UE
 		FScopeLock _(&Mutex);
 		if (Running.Contains(Key))
 		{
-			return false; // 已有同坐标任务
+			return false; // There is already a task with the same coordinates
 		}
 
 		TSharedPtr<TPromise<void>> Promise = MakeShared<TPromise<void>>();
@@ -58,7 +58,8 @@ bool UChunkWorkerPool::EnqueueBuildTask(FChunkHolder* Holder, bool bMeshOnly, UE
 		NewJob          = new FQueued;
 		NewJob->Key     = Key;
 		NewJob->Promise = MakeShared<TPromise<void>>();
-		NewJob->Func    = [Promise,Holder,bMeshOnly,World]()
+		Holder->bNeedsNeighborNotify.store(!bMeshOnly, std::memory_order_relaxed);
+		NewJob->Func = [Promise,Holder,bMeshOnly,World]()
 		{
 			if (bMeshOnly)
 			{
@@ -78,7 +79,7 @@ bool UChunkWorkerPool::EnqueueBuildTask(FChunkHolder* Holder, bool bMeshOnly, UE
 	return true;
 }
 
-/* ---------- Worker 调用 ---------- */
+// Called By worker
 bool UChunkWorkerPool::DequeueJob(TUniqueFunction<void()>& Out)
 {
 	FQueued* J = nullptr;
@@ -91,11 +92,11 @@ bool UChunkWorkerPool::DequeueJob(TUniqueFunction<void()>& Out)
 		Running.Remove(J->Key);
 	}
 
-	// 让 FQueued 随 Job 生命周期一起结束
+	// Let FQueued end with the Job lifecycle
 	TUniquePtr<FQueued> Task(J);
 	Out = [Task = MoveTemp(Task)]() mutable
 	{
-		Task->Func(); // 真正工作
+		Task->Func(); // Real work
 		if (Task->Promise.IsValid())
 		{
 			Task->Promise->SetValue();

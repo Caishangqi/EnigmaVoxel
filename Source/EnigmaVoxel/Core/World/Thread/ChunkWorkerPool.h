@@ -18,11 +18,11 @@ public:
 	void Shutdown();
 
 	// Task interface
-	bool EnqueueBuildTask(FChunkHolder* Holder, bool bMeshOnly, UEnigmaWorld* World = nullptr); // 外部调用
-	bool DequeueJob(TUniqueFunction<void()>& Out); // 被 Worker 调
+	bool EnqueueBuildTask(FChunkHolder* Holder, bool bMeshOnly, UEnigmaWorld* World = nullptr); // Called by external
+	bool DequeueJob(TUniqueFunction<void()>& Out); // Called by worker
 
 private:
-	/// Internal Structure
+	/// Internal Structure that hold lambda and future promise
 	struct FQueued
 	{
 		FIntVector                 Key;
@@ -30,10 +30,10 @@ private:
 		TFunction<void()>          Func;
 	};
 
-	/* === 数据 === */
+	// Data
 	TQueue<FQueued*>           Pending;
 	FCriticalSection           Mutex;
-	TMap<FIntVector, FQueued*> Running; // 去重
+	TMap<FIntVector, FQueued*> Running; // Remove duplicates
 	TArray<FChunkWorker*>      Workers;
 	TArray<FRunnableThread*>   Threads;
 	FThreadSafeBool            bStopping{false};
