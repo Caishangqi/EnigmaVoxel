@@ -38,11 +38,10 @@ void FWorldGen::RebuildMesh(UEnigmaWorld* World, FChunkHolder& H)
 			for (int x = 0; x < H.Dimension.X; ++x)
 			{
 				const FBlock& B = H.GetBlock({x, y, z});
-				if (!B.Definition)continue;
+				if (!B.Definition) { continue; }
 				AppendBoxForBlock(World, Tmp, B, H);
 			}
 		}
 	}
 	H.Mesh = CopyTemp(Tmp);
-	H.bDirty.store(false);
 }
