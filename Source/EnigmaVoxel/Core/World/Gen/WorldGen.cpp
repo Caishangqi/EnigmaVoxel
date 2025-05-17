@@ -3,9 +3,9 @@
 #include "EnigmaVoxel/Modules/Block/Block.h"
 #include "EnigmaVoxel/Modules/Chunk/ChunkHolder.h"
 
-void FWorldGen::GenerateFullChunk(FChunkHolder& H)
+void FWorldGen::GenerateFullChunk(UEnigmaWorld* World, FChunkHolder& H)
 {
-	//H.RefreshMaterialCache();
+	H.RefreshMaterialCache();
 	H.FillChunkWithArea(FIntVector(16, 16, 8), "Enigma", "Blue Enigma Block");
 	UE::Geometry::FDynamicMesh3 Tmp;
 	for (int z = 0; z < H.Dimension.Z; ++z)
@@ -23,10 +23,10 @@ void FWorldGen::GenerateFullChunk(FChunkHolder& H)
 			}
 		}
 	}
-	H.Mesh = MoveTemp(Tmp);
+	H.Mesh = CopyTemp(Tmp);
 }
 
-void FWorldGen::RebuildMesh(FChunkHolder& H)
+void FWorldGen::RebuildMesh(UEnigmaWorld* World, FChunkHolder& H)
 {
 	H.Mesh = UE::Geometry::FDynamicMesh3();
 	UE::Geometry::FDynamicMesh3 Tmp;
@@ -38,14 +38,11 @@ void FWorldGen::RebuildMesh(FChunkHolder& H)
 			for (int x = 0; x < H.Dimension.X; ++x)
 			{
 				const FBlock& B = H.GetBlock({x, y, z});
-				if (!B.Definition)
-				{
-					continue;
-				}
-				AppendBoxForBlock(Tmp, B, H);
+				if (!B.Definition)continue;
+				AppendBoxForBlock(World, Tmp, B, H);
 			}
 		}
 	}
-	H.Mesh = MoveTemp(Tmp);
+	H.Mesh = CopyTemp(Tmp);
 	H.bDirty.store(false);
 }
