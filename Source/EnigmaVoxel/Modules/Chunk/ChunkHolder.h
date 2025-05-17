@@ -14,10 +14,11 @@ struct FBlock;
 UENUM()
 enum class EChunkStage : uint8
 {
-	Unloaded,
-	Loading,
-	Ready,
-	PendingUnload
+	Unloaded, // No data in memory
+	Loading, // Thread pool is generating full blocks + grids meshes
+	Ready, // The Mesh has been constructed, but has not yet been copied into the Actor
+	Loaded, // Mesh has been synchronized to Actor, and the block is active
+	PendingUnload // Reference count = 0, waiting for the grace period to end before being destroyed
 };
 
 UENUM()
@@ -48,8 +49,9 @@ struct FChunkHolder
 	std::atomic<uint16>      RefCount{0};
 	std::atomic<EChunkStage> Stage{EChunkStage::Unloaded};
 	std::atomic<bool>        bDirty{false};
+	std::atomic<bool>        bNeedsNeighborNotify{false};
 	std::atomic<bool>        bQueuedForRebuild{false};
-	double                   PendingUnloadUntil = 0.0; // 0 == 未排队卸载
+	double                   PendingUnloadUntil = 0.0; // 0 == Not queued for unloading
 
 	/// Data
 	FIntVector                       Dimension{16, 16, 16};
@@ -73,7 +75,6 @@ struct FChunkHolder
 
 	// Ticket
 	void AddTicket();
-
 	void RemoveTicket(double Now, double Grace);
 };
 

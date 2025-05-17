@@ -212,7 +212,6 @@ bool IsFaceVisible(UEnigmaWorld* World, const FChunkHolder& ChunkHolder, int x, 
 			}
 			return false; // solid => invisible (need culled)
 		}
-	// break; // not strictly needed if we return
 
 	// -X
 	case EBlockDirection::SOUTH:
