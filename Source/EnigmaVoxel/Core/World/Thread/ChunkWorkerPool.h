@@ -4,6 +4,7 @@
 #include "Templates/SharedPointer.h"
 #include "ChunkWorkerPool.generated.h"
 
+class UEnigmaWorld;
 class FChunkWorker;
 struct FChunkHolder;
 
@@ -17,7 +18,7 @@ public:
 	void Shutdown();
 
 	// Task interface
-	bool EnqueueBuildTask(FChunkHolder* Holder, bool bMeshOnly); // 外部调用
+	bool EnqueueBuildTask(FChunkHolder* Holder, bool bMeshOnly, UEnigmaWorld* World = nullptr); // 外部调用
 	bool DequeueJob(TUniqueFunction<void()>& Out); // 被 Worker 调
 
 private:

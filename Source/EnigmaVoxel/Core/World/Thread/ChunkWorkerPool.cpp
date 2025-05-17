@@ -40,7 +40,7 @@ void UChunkWorkerPool::Shutdown()
 }
 
 /* ---------- 任务发布 ---------- */
-bool UChunkWorkerPool::EnqueueBuildTask(FChunkHolder* Holder, bool bMeshOnly)
+bool UChunkWorkerPool::EnqueueBuildTask(FChunkHolder* Holder, bool bMeshOnly, UEnigmaWorld* World)
 {
 	const FIntVector Key = Holder->Coords;
 
@@ -58,15 +58,15 @@ bool UChunkWorkerPool::EnqueueBuildTask(FChunkHolder* Holder, bool bMeshOnly)
 		NewJob          = new FQueued;
 		NewJob->Key     = Key;
 		NewJob->Promise = MakeShared<TPromise<void>>();
-		NewJob->Func    = [Promise,Holder,bMeshOnly]()
+		NewJob->Func    = [Promise,Holder,bMeshOnly,World]()
 		{
 			if (bMeshOnly)
 			{
-				FWorldGen::RebuildMesh(*Holder);
+				FWorldGen::RebuildMesh(World, *Holder);
 			}
 			else
 			{
-				FWorldGen::GenerateFullChunk(*Holder);
+				FWorldGen::GenerateFullChunk(World, *Holder);
 			}
 			Promise->SetValue();
 			Holder->Stage = EChunkStage::Ready;
