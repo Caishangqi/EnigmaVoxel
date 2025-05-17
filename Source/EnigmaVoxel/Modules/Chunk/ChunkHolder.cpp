@@ -83,6 +83,11 @@ void FChunkHolder::AddTicket()
 {
 	++RefCount;
 	PendingUnloadUntil = 0.0;
+
+	if (Stage == EChunkStage::PendingUnload || Stage == EChunkStage::Unloaded)
+	{
+		Stage = EChunkStage::Loading;
+	}
 }
 
 void FChunkHolder::RemoveTicket(double Now, double Grace)

@@ -36,9 +36,9 @@ struct FChunkHolder
 	FChunkHolder();
 	~FChunkHolder() = default;
 
-	FChunkHolder(const FChunkHolder&)            = delete; // 禁拷贝
+	FChunkHolder(const FChunkHolder&)            = delete;
 	FChunkHolder& operator=(const FChunkHolder&) = delete;
-	FChunkHolder(FChunkHolder&&)                 = default; // 允移动
+	FChunkHolder(FChunkHolder&&)                 = default;
 	FChunkHolder& operator=(FChunkHolder&&)      = default;
 
 	/// Key
