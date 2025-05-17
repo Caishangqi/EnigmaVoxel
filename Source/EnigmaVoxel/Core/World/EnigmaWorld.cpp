@@ -44,13 +44,13 @@ void UEnigmaWorld::FlushDirtyAndPending(double Now)
 	{
 		FChunkHolder* H = It.Value().Get();
 
-		/* --- bDirty -> 重构 --- */
+		// Dirty, need rebuild.
 		if (H->Stage == EChunkStage::Ready && H->bDirty.load() && !H->bQueuedForRebuild.exchange(true))
 		{
-			ChunkWorkerPool->EnqueueBuildTask(H, true); // Mesh only
+			ChunkWorkerPool->EnqueueBuildTask(H, true, this); // Mesh only
 		}
 
-		/* --- 宽限到期 -> 销毁 --- */
+		// Exceed Grace period, destroy.
 		if (H->Stage == EChunkStage::PendingUnload && H->PendingUnloadUntil < Now)
 		{
 			if (AChunkActor* CA = LoadedChunks.FindRef(H->Coords))
@@ -71,20 +71,20 @@ void UEnigmaWorld::Tick()
 	}
 	const double Now = FPlatformTime::Seconds();
 
-	/* 1) 收集本帧视野 */
+	// Collect the field of view of this tick
 	TSet<FIntVector> Desired;
 	GatherPlayerVisibleSet(Desired);
 
-	/* 2) 加/减票据 -> 提交任务/卸载 */
+	// Add / subtract tickets -> submit task/unload
 	ProcessTickets(Desired, Now);
 
-	/* 3) 线程池结果 → 生成或更新 Actor */
+	// Thread pool result → Generate or update Actor
 	PumpWorkerResults();
 
-	/* 4) 处理 bDirty 重构 & 真正销毁 PendingUnload 到期的区块 */
+	// Handle bDirty reconstruction & actually destroy the expired PendingUnload block
 	FlushDirtyAndPending(Now);
 
-	/* 5) 保存集合供下帧差集 */
+	// Save the collection for next tick difference
 	PrevVisibleSet = MoveTemp(Desired);
 }
 
@@ -126,7 +126,7 @@ void UEnigmaWorld::ProcessTickets(const TSet<FIntVector>& Desired, double Now)
 
 	FScopeLock _(&ChunksMutex);
 
-	/* ---- 加票 & 可能排任务 ---- */
+	// Add tickets & possibly schedule tasks
 	for (const FIntVector& C : ToLoad)
 	{
 		FChunkHolder* H = nullptr;
@@ -142,14 +142,13 @@ void UEnigmaWorld::ProcessTickets(const TSet<FIntVector>& Desired, double Now)
 		H->Coords = C;
 		H->AddTicket();
 
-		if (H->Stage == EChunkStage::Unloaded)
+		if (H->Stage == EChunkStage::Loading)
 		{
-			H->Stage = EChunkStage::Loading;
-			ChunkWorkerPool->EnqueueBuildTask(H, false); // 生成块+网格
+			ChunkWorkerPool->EnqueueBuildTask(H, false, this);
 		}
 	}
 
-	/* ---- 减票 (离开视野一次) ---- */
+	// Reduce ticket (leave the field of view once)
 	for (const FIntVector& C : ToUnload)
 	{
 		if (TUniquePtr<FChunkHolder>* Ptr = Chunks.Find(C))
@@ -167,39 +166,29 @@ void UEnigmaWorld::PumpWorkerResults()
 	for (auto& KV : Chunks)
 	{
 		FChunkHolder* H = KV.Value.Get();
-
-		/*if (H->Stage == EChunkStage::Loading && H->BuildFuture.IsValid() && H->BuildFuture->IsReady())
-		{
-			H->Stage = EChunkStage::Ready;
-		}*/
-
-		if (H->Stage != EChunkStage::Ready || LoadedChunks.Contains(KV.Key))
-		{
+		if (H->Stage != EChunkStage::Ready)
 			continue;
-		}
 
-		/* —— 在 GameThread 创建/更新 Actor —— */
-		AsyncTask(ENamedThreads::GameThread, [this,Coords = KV.Key, H]()
-		{
-			AChunkActor* CA = nullptr;
-			if (TObjectPtr<AChunkActor>* Found = LoadedChunks.Find(Coords))
-			{
-				CA = *Found;
-			}
-			else
-			{
-				FActorSpawnParameters P;
-				P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-				FVector Origin(Coords.X * 1600.f, Coords.Y * 1600.f, 0.f); // TODO: 坐标换算
-				CA = CurrentUWorld->SpawnActor<AChunkActor>(AChunkActor::StaticClass(), Origin, FRotator::ZeroRotator, P);
-				LoadedChunks.Add(Coords, CA);
-			}
-			UDynamicMesh*  DynMesh = CA->GetDynamicMeshComponent()->GetDynamicMesh();
-			FDynamicMesh3& MeshRef = DynMesh->GetMeshRef();
-			MeshRef                = MoveTemp(H->Mesh);
-			CA->UpdateChunkMaterial(*H);
-			NotifyNeighborsChunkLoaded(Coords);
-		});
+		AsyncTask(ENamedThreads::GameThread,
+		          [this, Coords = KV.Key, H]()
+		          {
+			          AChunkActor* CA = LoadedChunks.FindRef(Coords);
+			          if (!CA)
+			          {
+				          // This is the first time loading, and Spawn is required
+				          FActorSpawnParameters P;
+				          P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				          FVector Origin((float)Coords.X * 1600.f, (float)Coords.Y * 1600.f, 0.f);
+				          CA = CurrentUWorld->SpawnActor<AChunkActor>(
+					          AChunkActor::StaticClass(), Origin, FRotator::ZeroRotator, P);
+				          LoadedChunks.Add(Coords, CA);
+			          }
+
+			          // Regardless of whether it is new or old, copy the "latest" grid in
+			          UDynamicMesh* DynMesh = CA->GetDynamicMeshComponent()->GetDynamicMesh();
+			          DynMesh->GetMeshRef() = H->Mesh;
+			          CA->UpdateChunkMaterial(*H);
+		          });
 	}
 }
 
@@ -248,7 +237,7 @@ void UEnigmaWorld::NotifyNeighborsChunkLoaded(FIntVector ChunkCoords)
 			if (N->Stage == EChunkStage::Ready)
 			{
 				N->bDirty            = true;
-				N->bQueuedForRebuild = false; // 允许重新排 MeshOnly
+				N->bQueuedForRebuild = false; // Allow reordering of MeshOnly
 			}
 		}
 	}
@@ -263,7 +252,7 @@ void UEnigmaWorld::BeginDestroy()
 {
 	if (ChunkWorkerPool)
 	{
-		ChunkWorkerPool->Shutdown(); // 等待全部线程安全退出
+		ChunkWorkerPool->Shutdown(); // Wait for all threads to exit safely
 	}
 	Super::BeginDestroy();
 }
@@ -329,9 +318,9 @@ FIntVector UEnigmaWorld::BlockPosToChunkCoords(const FIntVector& BlockPos)
 FIntVector UEnigmaWorld::WorldPosToChunkLocalCoords(const FVector& WorldPos)
 {
 	FIntVector chunkCoords = WorldPosToChunkCoords(WorldPos);
-	// 计算 chunkWorldOrigin = (chunkCoords * ChunkWorldSize)
+	// Calculate chunkWorldOrigin = (chunkCoords * ChunkWorldSize)
 	FVector chunkWorldOrigin(static_cast<float>(chunkCoords.X) * ChunkWorldSize, static_cast<float>(chunkCoords.Y) * ChunkWorldSize, 0.f);
-	// 然后 (WorldPos - chunkWorldOrigin) / BlockWorldSize 就是相对于 chunk 的本地 block 索引
+	// Then (WorldPos - chunkWorldOrigin) / BlockWorldSize is the local block index relative to the chunk
 	float localBlockX = static_cast<float>(WorldPos.X - chunkWorldOrigin.X) / BlockWorldSize;
 	float localBlockY = static_cast<float>(WorldPos.Y - chunkWorldOrigin.Y) / BlockWorldSize;
 	float localBlockZ = static_cast<float>(WorldPos.Z - chunkWorldOrigin.Z) / BlockWorldSize;
@@ -358,20 +347,20 @@ UBlockDefinition* UEnigmaWorld::GetBlockAtWorldPos(const FVector& WorldPos)
 {
 	FIntVector chunkCoords = WorldPosToChunkCoords(WorldPos);
 
-	// 如果不存在或尚未加载
+	// If it does not exist or has not been loaded yet
 	if (!Chunks.Contains(chunkCoords))
 	{
-		return nullptr; // 表示此处是“空气”或区块不存在
+		return nullptr; // Indicates that this is "air" or the block does not exist
 	}
 	FChunkHolder* holder = Chunks[chunkCoords].Get();
 	if (holder->Stage != EChunkStage::Ready)
 	{
-		return nullptr; // 区块还没加载完，也当成空气处理
+		return nullptr; // The block has not been loaded yet, so it is treated as air.
 	}
 
-	// 获取在这个区块内的局部坐标
+	// Get the local coordinates within this block
 	FIntVector localCoords = WorldPosToChunkLocalCoords(WorldPos);
-	// 这里最好先检查 localCoords 是否都在 [0..15]
+	// It is best to check if localCoords are all in [0..15]
 	if (localCoords.X < 0 || localCoords.X >= holder->Dimension.X ||
 		localCoords.Y < 0 || localCoords.Y >= holder->Dimension.Y ||
 		localCoords.Z < 0 || localCoords.Z >= holder->Dimension.Z)
@@ -379,7 +368,7 @@ UBlockDefinition* UEnigmaWorld::GetBlockAtWorldPos(const FVector& WorldPos)
 		return nullptr;
 	}
 
-	// 获取此处的方块
+	// Get the block here
 	const FBlock& blockData = holder->GetBlock(localCoords);
 	if (!blockData.Definition)
 	{
@@ -390,5 +379,6 @@ UBlockDefinition* UEnigmaWorld::GetBlockAtWorldPos(const FVector& WorldPos)
 
 UBlockDefinition* UEnigmaWorld::GetBlockAtBlockPos(const FIntVector& BlockPos)
 {
+	//FScopeLock _(&ChunksMutex);
 	return GetBlockAtWorldPos(FVector(static_cast<float>(BlockPos.X) * BlockWorldSize, static_cast<float>(BlockPos.Y) * BlockWorldSize, static_cast<float>(BlockPos.Z) * BlockWorldSize));
 }

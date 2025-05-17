@@ -10,12 +10,12 @@ enum class ETicketType : uint8;
 struct FChunkHolder;
 class UChunkWorkerPool;
 /**
- * UEnigmaWorld 当成“逻辑和数据管理器”，在内部维护 Chunk 的数据结构，然后在需要显示或碰撞时，委托 UWorld 生成真正的 Actor。
- * 这样的设计也和 Minecraft 或 NeoForge Mod 十分类似：“世界数据”（你的 UEnigmaWorld） + “底层真实世界”（Unreal 的 UWorld）。
- *
- * 继续在 UEnigmaWorldSubsystem 中管理、实例化和查询你的 UEnigmaWorld，不必在编辑器里直接挂载它为关卡对象。只在游戏运行时中，
- * 去 SpawnActor<AChunk> 即可。
- */
+* UEnigmaWorld is used as a "logic and data manager" to maintain the data structure of Chunk internally, and then delegates UWorld to generate real Actor when display or collision is required.
+* This design is also very similar to Minecraft or NeoForge Mod: "world data" (your UEnigmaWorld) + "underlying real world" (Unreal's UWorld).
+*
+* Continue to manage, instantiate and query your UEnigmaWorld in UEnigmaWorldSubsystem, without directly mounting it as a level object in the editor. Only when the game is running,
+* Go to SpawnActor<AChunk>.
+*/
 UCLASS()
 class ENIGMAVOXEL_API UEnigmaWorld : public UObject
 {
@@ -42,8 +42,8 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Chunk")
 	TArray<TObjectPtr<APawn>> Players;
 
-	static constexpr int32  ViewRadius  = 3; // 玩家视野半径(区块)
-	static constexpr double GracePeriod = 1.0; // 卸载宽限
+	static constexpr int32  ViewRadius  = 3; // Player's field of view radius (blocks)
+	static constexpr double GracePeriod = 10; // Uninstall grace period
 
 	UFUNCTION(BlueprintCallable, Category="World")
 	bool SetUWorldTarget(UWorld* UnrealBuildInWorld);
