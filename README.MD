@@ -75,8 +75,7 @@ noise-based world generation.
 
 ### Prototype: 多线程生成Chunk生成实现
 
-在这个里程碑，`AChunk`所有的区块数据被抽离至`FChunkHolder`。该数据结构包含 `FDynamicMesh` 构建`AChunk`时所需要的顶点和面。主线程可以调用 `BeginLoadChunkAsync()` 开始在Unreal Engine的线程池中分配任务,子线程将会执行
-`GenerateChunkDataAsync()` 生成该区块坐标所需要的的所有数据并在线程函数的回调时在主线程生成`AChunk` Actor。
+在这个里程碑，`AChunk`所有的区块数据被抽离至`FChunkHolder`。该数据结构包含 `FDynamicMesh` 构建`AChunk`时所需要的顶点和面以及所有的方块信息。随后基于玩家视野范围计算需要添加的区块构建任务给`ChunkWorkerPool`通过 `EnqueueBuildTask()`
 
 <p align="center">
 <img src = "https://github.com/Caishangqi/EnigmaVoxel/blob/53ec02f39083d8b1740c5533eeeead407e938c91/Doc/res/Milestone_Chunk_16x8_Asyn.gif" alt="Milestone Async Chunk generation">
@@ -99,7 +98,7 @@ noise-based world generation.
 ## 兴趣点 Point Of Interest
 兴趣点是里程碑 **MileStone** 实现完毕后的技术总结，通常意味着项目确定使用该方案并且抛弃或者存档原本的技术方案(或许会保留原本的branch)
 
-- 基于参考Minecraft区块系统的 线程池拉模型
+- [**Chunk Pool Pull Model 线程池拉模型**](https://github.com/Caishangqi/EnigmaVoxel/blob/master/Doc/article/01-ChunkPoolPullModel.MD) (参考了Minecraft的 Queue Chunk Pool)
 
 ## 特别说明
 
