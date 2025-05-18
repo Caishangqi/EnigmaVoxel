@@ -20,6 +20,19 @@
 EnigmaVoxel is a voxel-based terrain system for Unreal Engine 5.5, featuring dynamic chunk loading, hidden vertex/triangle culling, C++ core components, blueprint-derived block types, and Perlin
 noise-based world generation.
 
+<!-- TOC -->
+* [Project: Enigma Voxel](#project-enigma-voxel)
+  * [概述 Overview](#概述-overview)
+  * [特性 Feature](#特性-feature)
+  * [待优化 To be optimized](#待优化-to-be-optimized)
+  * [里程碑 Milestone](#里程碑-milestone)
+    * [Prototype: 基于范围的平面Chunk生成](#prototype-基于范围的平面chunk生成)
+    * [Prototype: 多线程生成Chunk生成实现](#prototype-多线程生成chunk生成实现)
+    * [Prototype: 区块加载后剔除相邻面](#prototype-区块加载后剔除相邻面)
+  * [兴趣点 Point Of Interest](#兴趣点-point-of-interest)
+  * [特别说明](#特别说明)
+<!-- TOC -->
+
 ## 特性 Feature
 
 > *斜体* 内容代表计划内容，非斜体代表已经完善的内容
@@ -42,7 +55,7 @@ noise-based world generation.
 ## 待优化 To be optimized
 
 - **(已完成)** *使用Unreal Engine的**多线程**管理去多线程计算区块数据逻辑，以及渲染的顶点(struct 数据结构)，虽然我们无法在生成和渲染时使用多线程 (UE 强制Spawn Actor和渲染使用主线程)*
-- *实现**Chunk Pool**,当玩家离开Chunk视野范围时不直接进行区块卸载操作,先让Chunk `UnTick()` 并且不可见，随后在指定时间后真正地`Unload()`他们。*
+- **(90%)** *实现**Chunk Pool**,当玩家离开Chunk视野范围时不直接进行区块卸载操作,先让Chunk `UnTick()` 并且不可见，随后在指定时间后真正地`Unload()`他们。*
 
 ## 里程碑 Milestone
 
@@ -62,8 +75,8 @@ noise-based world generation.
 
 ### Prototype: 多线程生成Chunk生成实现
 
-在这个里程碑，AChunk所有的区块数据被抽离至FChunkData。该数据结构包含 FDynamicMesh 构建AChunk时所需要的顶点和面。主线程可以调用 `BeginLoadChunkAsync()` 开始在Unreal Engine的线程池中分配任务,子线程将会执行
-`GenerateChunkDataAsync()` 生成该区块坐标所需要的的所有数据并在线程函数的回调时在主线程生成AChunk Actor。
+在这个里程碑，`AChunk`所有的区块数据被抽离至`FChunkHolder`。该数据结构包含 `FDynamicMesh` 构建`AChunk`时所需要的顶点和面。主线程可以调用 `BeginLoadChunkAsync()` 开始在Unreal Engine的线程池中分配任务,子线程将会执行
+`GenerateChunkDataAsync()` 生成该区块坐标所需要的的所有数据并在线程函数的回调时在主线程生成`AChunk` Actor。
 
 <p align="center">
 <img src = "https://github.com/Caishangqi/EnigmaVoxel/blob/53ec02f39083d8b1740c5533eeeead407e938c91/Doc/res/Milestone_Chunk_16x8_Asyn.gif" alt="Milestone Async Chunk generation">
@@ -73,6 +86,7 @@ noise-based world generation.
 > 当加载完毕时则需重新更新一次FDynamicMesh来剔除那些在区块连接处的重叠的面。(不过这是纯美观层面)
 
 ### Prototype: 区块加载后剔除相邻面
+
 当前阶段实现了区块在加载完毕后通知相邻区块`NotifyNeighborsChunkLoaded()`重新更新自己的vertices的步骤`RebuildChunkMeshData()`。这里没有使用`AChunk`来监听加载事件是因为在
 `UEnigmaWorld`中我们能知道当前所有区块加载的状态而`AChunk`的生命周期往往要比`UEnigmaWorld`慢。(因为它是Unreal Engine的Actor并非纯数据对象)
 
@@ -81,6 +95,11 @@ noise-based world generation.
 </p>
 
 > 当前阶段没有性能问题但是仍然需要时刻注意这类问题的隐患，例如，如果一个方块被玩家破坏了，那么它周围的方块的顶点也需要重新计算，这可能会导致性能问题。不过该优化在贴图实现里程碑之后。
+
+## 兴趣点 Point Of Interest
+兴趣点是里程碑 **MileStone** 实现完毕后的技术总结，通常意味着项目确定使用该方案并且抛弃或者存档原本的技术方案(或许会保留原本的branch)
+
+- 基于参考Minecraft区块系统的 线程池拉模型
 
 ## 特别说明
 
