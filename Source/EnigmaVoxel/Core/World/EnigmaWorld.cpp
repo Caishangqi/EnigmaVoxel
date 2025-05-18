@@ -147,7 +147,7 @@ void UEnigmaWorld::PumpWorkerResults()
 			{
 				FActorSpawnParameters P;
 				P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-				FVector Origin(Coords.X * 1600.f, Coords.Y * 1600.f, 0.f); // TODO: Parameterize the statement
+				FVector Origin((float)Coords.X * 1600.f, (float)Coords.Y * 1600.f, 0.f); // TODO: Parameterize the statement
 				CA = CurrentUWorld->SpawnActor<AChunkActor>(
 					AChunkActor::StaticClass(), Origin, FRotator::ZeroRotator, P);
 				LoadedChunks.Add(Coords, CA);
